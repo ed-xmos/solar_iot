@@ -51,71 +51,8 @@ typedef interface i_esp_rx_server {
   [[clears_notification]] esp_event_t check_event(void);
 }i_esp_event;
 
-
-int ok_flag = 0;
-int err_flag = 0;
-int cmd_flag = 0;
-
-unsafe{
-  volatile int * unsafe ok_flag_ptr = &ok_flag;
-  volatile int * unsafe err_flag_ptr = &err_flag;
-  volatile int * unsafe cmd_flag_ptr = &cmd_flag;
-
-}
-
 static void fail(char * str){
     printstrln(str);
-}
-
-void app_output( client uart_rx_if uart_rx)
-{
-  printstrln("Output console started");
-  char rx_history[6] = {0};
-  while(1) {
-    char rx = uart_rx.wait_for_data_and_read();
-    //shift FIFO along
-    rx_history[5] = rx_history[4];
-    rx_history[4] = rx_history[3];
-    rx_history[3] = rx_history[2];
-    rx_history[2] = rx_history[1];
-    rx_history[1] = rx_history[0];
-    rx_history[0] = rx;        
-    printchar(rx);
-    if (!memcmp(rx_history, "KO\n\r", 4)) unsafe {
-      unsafe {*ok_flag_ptr = 1;}
-    }
-    if (!memcmp(rx_history, "RORRE", 6)) unsafe {
-      unsafe {*err_flag_ptr = 1;}
-    }
-    if (!memcmp(rx_history, "sutats", 6)) unsafe {
-      unsafe {*cmd_flag_ptr = 1;}
-    }
-  }
-}
-
-static int send_cmd_ack(const char *send_string, client uart_tx_if uart_tx)
-{
-  int ret_val = -1; //error
-  size_t len = strlen(send_string);
-  for(size_t j = 0; j < len; j++) {
-    uart_tx.write(send_string[j]);
-  }
-  uart_tx.write('\r');
-  uart_tx.write('\n');
-  unsafe {
-    while(!*ok_flag_ptr && !*err_flag_ptr);
-    if (*err_flag_ptr) {
-      *err_flag_ptr = 0;
-      ret_val = -1;
-      printstr("\n**ERROR running cmd: ");
-      printstrln(send_string);
-    }
-    if (*ok_flag_ptr) {
-      *ok_flag_ptr = 0;
-      ret_val = 0;
-    }
-  }
-  return ret_val;
 }
 
 const char s0[] = "AT+GMR"; //Firmware info
@@ -128,30 +65,6 @@ const char s6[] = "AT+CIPSERVER=1,80"; //run a TCP server on port 80
 const char s7[] = "AT+CIPSTART=0,\"TCP\",\"192.168.1.5\",6123"; //Connect as client
 const char s8[] = "AT+CIPSEND=0,10"; //Send packet
 const char s9[] = "Power=100W";
-
-void app_input(client uart_tx_if uart_tx)
-{
-
-  //send_cmd_ack(s0, uart_tx);
-
-  send_cmd_ack(s4, uart_tx);
-  //send_cmd_ack(s1, uart_tx);
-  //send_cmd_ack(s2, uart_tx);
-  //send_cmd_ack(s3, uart_tx);
-  //send_cmd_ack(s4, uart_tx);
-  send_cmd_ack(s5, uart_tx);
-  send_cmd_ack(s6, uart_tx);
-  //delay_seconds(1);
-  send_cmd_ack(s7, uart_tx);
-  while(1) unsafe {
-    if (*cmd_flag_ptr) {
-      printstrln("**STATUS**");
-      *cmd_flag_ptr = 0;
-      send_cmd_ack(s8, uart_tx);
-      send_cmd_ack(s9, uart_tx);
-    }
-  }
-}
 
 #define SECOND_TICKS   100000000
 
@@ -270,7 +183,8 @@ void esp_console_task(server i_esp_console i_esp, client uart_tx_if i_uart_tx, c
 
             case i_uart_rx.data_ready(void):
                 char rx = i_uart_rx.read();
-                if (fifo_push(&fifo, rx) != FIFO_SUCCESS) fail("Fifo full");
+                buffer[dbl_buff_idx][buff_idx] = rx;
+                ++buff_idx;
                 int is_newline = match_str(&newline, rx);
                 int is_ok = match_str(&ok, rx);
                 int is_custom = match_str(&custom, rx);
@@ -287,6 +201,7 @@ void esp_console_task(server i_esp_console i_esp, client uart_tx_if i_uart_tx, c
                 }
                 if (is_ok) {
                     last_event = ESP_OK;
+                    i_esp.esp_event();
                     break;
                 }
                 if (is_newline) {
@@ -387,7 +302,7 @@ void app_new(client i_esp_console i_esp){
     i_esp.send_cmd_ack(s2, response, 10);
 }
 
-/* "main" function that sets up two uarts and the application */
+/* "main" function that sets up two uarts, console and the application */
 int main() {
   interface uart_rx_if i_rx;
   interface uart_tx_if i_tx;
@@ -403,17 +318,9 @@ int main() {
     on tile[0].core[0] : uart_rx(i_rx, null, RX_BUFFER_SIZE,
                                  BAUD_RATE, UART_PARITY_NONE, 8, 1,
                                  i_gpio_rx);
-#if OLD
-    on tile[0]: {
-      p_ch_pd <: 1;
-      app_input(i_tx);
-    }
-    on tile[0]: app_output(i_rx);
 
-#else
     on tile[0]: app_new(i_esp);
     on tile[0]: esp_console_task(i_esp, i_tx, i_rx);
-#endif
   }
   return 0;
 }
