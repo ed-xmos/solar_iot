@@ -15,8 +15,8 @@ port p_uart_rx = on tile[0] : XS1_PORT_1G; //22
 port p_uart_tx = on tile[0] : XS1_PORT_1H; //23
 port p_ch_pd   = on tile[0] : XS1_PORT_1I; //24
 
-#define BAUD_RATE 116200    //FOund to be more stable at this rate compared with 119200
-#define RX_BUFFER_SIZE 128
+#define BAUD_RATE 116200    //Found to be more stable at this rate compared with 119200
+#define RX_BUFFER_SIZE 4096
 
 typedef enum esp_commands_t {
   ESP_CONNECT
@@ -30,18 +30,27 @@ typedef enum esp_event_t {
   ESP_TIMEOUT = -2,
 }esp_event_t;
 
+typedef enum esp_result_t {
+    ESP_BUFFER_OK = 0,
+    ESP_BUFFER_LOST
+} esp_result_t;
 
 typedef interface i_esp_console {
-  void send_cmd_ack(esp_commands_t command, unsigned timeout_s);
+  void send_cmd_ack(const char * command, char * response, unsigned timeout_s);
   void send_cmd_search_ack(esp_commands_t command, char *search, unsigned timeout_s);
+  void send_cmd_noack(esp_commands_t command, unsigned timeout_s);
+  void send_cmd_search_noack(esp_commands_t command, char *search, unsigned timeout_s);
+  esp_result_t get_buffer(char * response);
   [[notification]] slave void esp_event(void);
   [[clears_notification]] esp_event_t check_event(void);
 }i_esp_console;
 
-typedef interface i_esp_event {
+typedef interface i_esp_rx_server {
+  esp_result_t get_buffer(char * rx_buff);
   [[notification]] slave void esp_event(void);
   [[clears_notification]] esp_event_t check_event(void);
 }i_esp_event;
+
 
 int ok_flag = 0;
 int err_flag = 0;
@@ -144,12 +153,16 @@ void app_input(client uart_tx_if uart_tx)
   }
 }
 
+#define SECOND_TICKS   100000000
 
 void esp_console_task(server i_esp_console i_esp, client uart_tx_if i_uart_tx, client uart_rx_if i_uart_rx) {
 
     esp_event_t last_event = ESP_OK;
 
-    char response[FIFO_SIZE] = {0};
+    char buffer[2][RX_BUFFER_SIZE] = {{0}};
+    int dbl_buff_idx = 0;
+    int buff_idx = 0;
+    int buffer_read = 1;
 
     fifo_t rx_fifo;
     fifo_init(&rx_fifo);
@@ -168,19 +181,89 @@ void esp_console_task(server i_esp_console i_esp, client uart_tx_if i_uart_tx, c
     init_match(&custom, "");
 
     match_t newline;
-    init_match(&custom, "\n\r");
+    init_match(&newline, "\n\r");
 
     fifo_t fifo;
     fifo_init(&fifo);
 
     while(1){
         select{
-            case i_esp.send_cmd_ack(esp_commands_t command, unsigned timeout_s):
-                for (int i = 0; i < strlen(s2); i++) i_uart_tx.write(s2[i]);
+            case i_esp.send_cmd_ack(const char * command, char * response, unsigned timeout_s):
+                for (int i = 0; i < strlen(command); i++) i_uart_tx.write(command[i]);
+                i_uart_tx.write('\n');
+                i_uart_tx.write('\r');
+
+                int lf_found = 0;
+                int timed_out = 0;
+                timeout_t :> timeout_trig;
+                timeout_trig += (timeout_s * SECOND_TICKS);
+                while (!lf_found && !timed_out) {
+                    char rx = 0;
+                    static char rx_last = 0;
+                    select{
+                        case i_uart_rx.data_ready():
+                            rx = i_uart_rx.read();
+                            *response = rx;
+                            ++response;
+                            if (rx == '\r' && rx_last == '\n') lf_found = 1;
+                            break;
+                        case timeout_t when timerafter(timeout_trig) :> void:
+                            timed_out = 1;
+                            break;
+                    }
+                }
                 break;
+
             case i_esp.send_cmd_search_ack(esp_commands_t command, char * search_term, unsigned timeout_s):
-                //i_esp.esp_event();
+                for (int i = 0; i < strlen(s2); i++) i_uart_tx.write(s2[i]);
+                i_uart_tx.write('\n');
+                i_uart_tx.write('\r');
+                init_match(&custom, search_term);
+                int lf_found = 1;
+                int timed_out = 1;
+                timeout_t :> timeout_trig;
+                timeout_trig += (timeout_s * SECOND_TICKS);
+                while (!lf_found && !timed_out) {
+                    char rx = 0;
+                    static char rx_last = 0;
+                    select{
+                        case i_uart_rx.data_ready():
+                            rx = i_uart_rx.read();
+                            //response[response_idx] = rx;
+                            //++response_idx;
+                            if (rx == '\r' && rx_last == '\n') lf_found = 1;
+                            break;
+                        case timeout_t when timerafter(timeout_trig) :> void:
+                            timed_out = 1;
+                            break;
+                    }
+                }
                 break;
+
+            case i_esp.send_cmd_noack(esp_commands_t command, unsigned timeout_s):
+                for (int i = 0; i < strlen(s2); i++) i_uart_tx.write(s2[i]);
+                i_uart_tx.write('\n');
+                i_uart_tx.write('\r');
+                if (timeout_s) {
+                    timeout_t :> timeout_trig;
+                    timeout_trig += (timeout_s * SECOND_TICKS);
+                    timer_enabled = 1;
+                }
+                break;
+
+            case i_esp.send_cmd_search_noack(esp_commands_t command, char * search_term, unsigned timeout_s):
+                 for (int i = 0; i < strlen(s2); i++) i_uart_tx.write(s2[i]);
+                 i_uart_tx.write('\n');
+                 i_uart_tx.write('\r');
+                 init_match(&custom, search_term);
+                 if (timeout_s) {
+                     timeout_t :> timeout_trig;
+                     timeout_trig += (timeout_s * SECOND_TICKS);
+                     timer_enabled = 1;
+                 }
+                break;
+
+
             case i_esp.check_event(void) -> esp_event_t event:
                 event = last_event;
                 break;
@@ -207,15 +290,20 @@ void esp_console_task(server i_esp_console i_esp, client uart_tx_if i_uart_tx, c
                     break;
                 }
                 if (is_newline) {
-                    char chr;
-                    for (char * response_ptr = response; FIFO_EMPTY != fifo_pop(&fifo, &chr);) {
-                        *response_ptr = chr;
-                        response_ptr++;
-                    }
-                    printstr(response);
+                    buffer[dbl_buff_idx][buff_idx] = 0; //string terminator
+                    printstr( buffer[dbl_buff_idx]);
+                    dbl_buff_idx ^= 1;
+                    buff_idx = 0;
+                    buffer_read = 0;
+                    timer_enabled = 0;
                 }
                 break;
 
+
+            case i_esp.get_buffer(char * rx_buff) -> esp_result_t buffer_lost:
+                strcpy(rx_buff, buffer[dbl_buff_idx ^ 1]);
+                buffer_lost = ESP_BUFFER_OK;
+                break;
 
             case timer_enabled => timeout_t when timerafter(timeout_trig) :> void:
                 timer_enabled = 0;
@@ -227,12 +315,86 @@ void esp_console_task(server i_esp_console i_esp, client uart_tx_if i_uart_tx, c
 }
 
 
+void esp_rx_task(server interface i_esp_rx_server i_esp_rx, client uart_rx_if i_uart_rx){
+    char buffer[2][RX_BUFFER_SIZE] = {{0}};
+    int dbl_buff_idx = 0;
+    int buff_idx = 0;
+    int buffer_read = 1;
+
+    esp_event_t last_event = ESP_OK;
+
+    match_t error;
+    init_match(&error, "ERROR");
+
+    match_t ok;
+    init_match(&ok, "OK");
+
+    match_t custom;
+    init_match(&custom, "");
+
+    match_t newline;
+    init_match(&newline, "\n\r");
+
+    while(1){
+        select{
+            case i_uart_rx.data_ready(void):
+                char rx = i_uart_rx.read();
+                buffer[dbl_buff_idx][buff_idx] = rx;
+                ++buff_idx;
+                int is_newline = match_str(&newline, rx);
+                int is_ok = match_str(&ok, rx);
+                int is_custom = match_str(&custom, rx);
+                int is_error = match_str(&error, rx);
+                if (is_error) {
+                    last_event = ESP_ERROR;
+                    i_esp_rx.esp_event();
+                    break;
+                }
+                if (is_custom) {
+                    last_event = ESP_SEARCH_FOUND;
+                    i_esp_rx.esp_event();
+                    break;
+                }
+                if (is_ok) {
+                    last_event = ESP_OK;
+                    break;
+                }
+                if (is_newline) {
+                    buffer[dbl_buff_idx][buff_idx] = 0; //string terminator
+                    printstr( buffer[dbl_buff_idx]);
+                    dbl_buff_idx ^= 1;
+                    buff_idx = 0;
+                    buffer_read = 0;
+                    i_esp_rx.esp_event();
+                }
+                break;
+
+
+            case i_esp_rx.get_buffer(char * rx_buff) -> esp_result_t buffer_lost:
+                strcpy(rx_buff, buffer[dbl_buff_idx ^ 1]);
+                buffer_lost = ESP_BUFFER_OK;
+                break;
+
+            case i_esp_rx.check_event(void) -> esp_event_t event:
+                event = last_event;
+                break;
+        }
+    }
+}
+
+void app_new(client i_esp_console i_esp){
+    char response[RX_BUFFER_SIZE];
+    i_esp.send_cmd_ack(s2, response, 10);
+}
+
 /* "main" function that sets up two uarts and the application */
 int main() {
   interface uart_rx_if i_rx;
   interface uart_tx_if i_tx;
   input_gpio_if i_gpio_rx;
   output_gpio_if i_gpio_tx[1];
+
+  i_esp_console i_esp;
   par {
     on tile[0]: output_gpio(i_gpio_tx, 1, p_uart_tx, null);
     on tile[0]: uart_tx(i_tx, null,
@@ -241,11 +403,17 @@ int main() {
     on tile[0].core[0] : uart_rx(i_rx, null, RX_BUFFER_SIZE,
                                  BAUD_RATE, UART_PARITY_NONE, 8, 1,
                                  i_gpio_rx);
+#if OLD
     on tile[0]: {
       p_ch_pd <: 1;
       app_input(i_tx);
     }
     on tile[0]: app_output(i_rx);
+
+#else
+    on tile[0]: app_new(i_esp);
+    on tile[0]: esp_console_task(i_esp, i_tx, i_rx);
+#endif
   }
   return 0;
 }
