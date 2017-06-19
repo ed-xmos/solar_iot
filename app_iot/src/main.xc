@@ -13,24 +13,15 @@
 
 #include "app_settings.h"
 
-
-#define SSID        Badger
-#define PASSWORD    Mouse2000
-
 // Port declarations
 port p_uart_rx = on tile[0] : XS1_PORT_1G; //22
 port p_uart_tx = on tile[0] : XS1_PORT_1H; //23
 port p_ch_pd   = on tile[0] : XS1_PORT_1I; //24
 
-
-static void fail(char * str){
-    printstrln(str);
-}
-
 const char fw_info[]        = "AT+GMR"; //Firmware info
 const char set_ap_mode[]    = "AT+CWMODE=3";  //AP & client
 const char list_ap[]        = "AT+CWLAP"; //List AP
-const char connect[]        = "AT+CWJAP=\"SSID\",\"PASSWORD\"";
+const char connect[]        = "AT+CWJAP=\"Badger\",\"Mouse2000\"";
 const char get_ip[]         = "AT+CIFSR"; //get IP address
 const char enable_conns[]   = "AT+CIPMUX=1";  //Enable multiple connections
 const char run_tcp_serv[]   = "AT+CIPSERVER=1,80"; //run a TCP server on port 80
@@ -41,6 +32,10 @@ const char a_message[]      = "Power=100W";
 void app_new(client i_esp_console i_esp){
     char response[RX_BUFFER_SIZE];
     char outcome_msg[32];
+
+    puts(connect);
+    printf("message=%s", connect);
+
     i_esp.send_cmd_ack(list_ap, response, 10);
     printf("Response: %s\n", response);
 

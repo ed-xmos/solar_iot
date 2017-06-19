@@ -36,6 +36,8 @@ void esp_console_task(server i_esp_console i_esp, client uart_tx_if i_uart_tx, c
     match_t newline;
     init_match(&newline, "\n\r");
 
+    printstrln("esp_console_task started\n");
+
     while(1){
         select{
             case i_esp.send_cmd_ack(const char * command, char * response, unsigned timeout_s):
