@@ -15,8 +15,10 @@ typedef enum esp_event_t {
   ESP_OK = 0,
   ESP_SEARCH_FOUND = 1,
   ESP_RESPONSE_READY = 2,
-  ESP_ERROR = -1,
-  ESP_TIMEOUT = -2,
+  ESP_BUSY = -1,
+  ESP_ERROR = -2,
+  ESP_TIMEOUT = -3,
+  ESP_NO_EVENT = -4
 }esp_event_t;
 
 typedef enum esp_result_t {
@@ -25,8 +27,8 @@ typedef enum esp_result_t {
 } esp_result_t;
 
 typedef interface i_esp_console {
-  void send_cmd_ack(const char * command, char * response, unsigned timeout_s);
-  void send_cmd_search_ack(const char * command, char * response, char *search, unsigned timeout_s);
+  esp_event_t send_cmd_ack(const char * command, char * response, unsigned timeout_s);
+  esp_event_t send_cmd_search_ack(const char * command, char * response, char *search, unsigned timeout_s);
   void send_cmd_noack(const char * command, unsigned timeout_s);
   void send_cmd_search_noack(const char * command, char *search, unsigned timeout_s);
   esp_result_t get_buffer(char * response);

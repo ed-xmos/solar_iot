@@ -30,17 +30,17 @@ const char cnd_send_packet[]= "AT+CIPSEND=0,10"; //Send packet
 const char a_message[]      = "Power=100W";
 
 void app_new(client i_esp_console i_esp){
-    char response[RX_BUFFER_SIZE];
-    char outcome_msg[32];
-
-    puts(connect);
-    printf("message=%s", connect);
-
-    i_esp.send_cmd_ack(list_ap, response, 10);
-    printf("Response: %s\n", response);
-
-    i_esp.send_cmd_noack(connect, 10);
+    char response[RX_BUFFER_SIZE] = {0};
+    char outcome_msg[32] = {0};
     esp_event_t outcome;
+
+    memset(response, 0, RX_BUFFER_SIZE);
+    outcome = i_esp.send_cmd_ack(fw_info, response, 10);
+    event_to_text(outcome, outcome_msg);
+    printf("Response: %s, outcome: %s\n", response, outcome_msg);
+
+    i_esp.send_cmd_noack(get_ip, 1);
+    memset(response, 0, RX_BUFFER_SIZE);
     outcome = esp_wait_for_event(i_esp, response);
     event_to_text(outcome, outcome_msg);
     printf("Response: %s, outcome: %s\n", response, outcome_msg);
