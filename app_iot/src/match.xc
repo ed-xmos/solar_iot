@@ -11,8 +11,10 @@
 void init_match(match_t *match, char search_str[]){
     strcpy(match->search_str, search_str);
     match->len = strlen(match->search_str);
+    //printstrln(match->search_str); printintln(match->len);
     match->chars_found = 0;
     if (match->len > 0) match->valid = 1;
+    else match->valid = 0;
 }
 
 search_result_t match_str(match_t *match, char chr){
