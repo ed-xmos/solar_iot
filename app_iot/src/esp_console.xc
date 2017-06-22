@@ -161,27 +161,26 @@ void esp_console_task(server i_esp_console i_esp, client uart_tx_if i_uart_tx, c
                 int is_busy = match_str(&busy, rx);
                 int is_custom = match_str(&custom, rx);
                 int is_error = match_str(&error, rx);
-                if (is_error) {
-                    last_event = ESP_ERROR;
-                    i_esp.esp_event();
-                    break;
-                }
-                if (is_busy) {
-                    last_event = ESP_BUSY;
-                    i_esp.esp_event();
-                    break;
-                }
+
                 if (is_custom) {
                     last_event = ESP_SEARCH_FOUND;
                     i_esp.esp_event();
                     break;
                 }
+
+                if (is_error) {
+                    last_event = ESP_ERROR;
+                    i_esp.esp_event();
+                }
+                if (is_busy) {
+                    last_event = ESP_BUSY;
+                    i_esp.esp_event();
+                }
                 if (is_ok) {
                     last_event = ESP_OK;
                     i_esp.esp_event();
-                    break;
                 }
-                if (is_newline) {
+                if (is_ok || is_busy || is_error) {
                     //printstr( buffer[dbl_buff_idx]);
                     dbl_buff_idx ^= 1;  //Flip buffers
                     buffer[dbl_buff_idx][buff_idx] = 0; //string terminate new buffer
