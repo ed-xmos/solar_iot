@@ -202,6 +202,11 @@ void esp_console_task(server i_esp_console i_esp, client uart_tx_if i_uart_tx, c
                 timer_enabled = 0;
                 last_event = ESP_TIMEOUT;
                 printstrln("timeout case");
+                dbl_buff_idx ^= 1;  //Flip buffers
+                buffer[dbl_buff_idx][buff_idx] = 0; //string terminate new buffer
+                buff_idx = 0;
+                buffer_lost = (buffer_read == 0) ? 1 : 0;
+                buffer_read = 0;
                 i_esp.esp_event();
                 break;
         }
