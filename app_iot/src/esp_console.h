@@ -11,6 +11,14 @@
 #include "app_settings.h"
 #include "uart.h"
 
+//Set of defines to build login string from user defined login/password
+#define xstr(s) str(s)
+#define str(s) #s
+#define CN0         "AT+CWJAP=\""
+#define CN1         "\",\""
+#define CN2         "\""
+#define CONNECT     CN0 xstr(SSID) CN1 xstr(PASSWORD) CN2
+
 typedef enum esp_event_t {
   ESP_OK = 0,
   ESP_SEARCH_FOUND = 1,

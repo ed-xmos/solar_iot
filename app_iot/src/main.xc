@@ -21,7 +21,7 @@ port p_ch_pd   = on tile[0] : XS1_PORT_1I; //24
 const char fw_info[]        = "AT+GMR"; //Firmware info
 const char set_ap_mode[]    = "AT+CWMODE=3";  //AP & client
 const char list_ap[]        = "AT+CWLAP"; //List AP
-const char connect[]        = "AT+CWJAP=\"Badger\",\"Mouse2000\"";
+const char connect[]        = CONNECT;
 const char get_ip[]         = "AT+CIFSR"; //get IP address
 const char enable_conns[]   = "AT+CIPMUX=1";  //Enable multiple connections
 const char run_tcp_serv[]   = "AT+CIPSERVER=1,80"; //run a TCP server on port 80
@@ -33,6 +33,8 @@ void app_new(client i_esp_console i_esp){
     char response[RX_BUFFER_SIZE] = {0};
     char outcome_msg[32] = {0};
     esp_event_t outcome;
+
+    printstrln (connect);
 
     memset(response, 0, RX_BUFFER_SIZE);
     outcome = i_esp.send_cmd_ack(fw_info, response, 10);
