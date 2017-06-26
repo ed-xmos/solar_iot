@@ -225,6 +225,16 @@ esp_event_t esp_wait_for_event(client i_esp_console i_esp, char * response){
     return event;
 }
 
+esp_event_t send_cmd_ack(client i_esp_console i_esp, const char * command, char * response, unsigned timeout_s){
+    i_esp.send_cmd_noack(command, timeout_s);
+    return esp_wait_for_event(i_esp, response);
+}
+
+esp_event_t send_cmd_search_ack(client i_esp_console i_esp, const char * command, char * response, char * search, unsigned timeout_s){
+    i_esp.send_cmd_search_noack(command, search, timeout_s);
+    return esp_wait_for_event(i_esp, response);
+}
+
 
 void event_to_text(esp_event_t event, char * string){
     switch (event){

@@ -45,6 +45,8 @@ typedef interface i_esp_rx_server {
 void esp_console_task(server i_esp_console i_esp, client uart_tx_if i_uart_tx, client uart_rx_if i_uart_rx);
 esp_event_t esp_wait_for_event(client i_esp_console i_esp, char * response);
 void event_to_text(esp_event_t event, char * string);
+esp_event_t send_cmd_ack(client i_esp_console i_esp, const char * command, char * response, unsigned timeout_s);
+esp_event_t send_cmd_search_ack(client i_esp_console i_esp, const char * command, char * response, char * search, unsigned timeout_s);
 
 
 #endif /* ESP_CONSOLE_H_ */
