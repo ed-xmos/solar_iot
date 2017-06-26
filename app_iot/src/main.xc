@@ -26,7 +26,7 @@ const char get_ip[]         = "AT+CIFSR"; //get IP address
 const char enable_conns[]   = "AT+CIPMUX=1";  //Enable multiple connections
 const char run_tcp_serv[]   = "AT+CIPSERVER=1,80"; //run a TCP server on port 80
 const char conn_client[]    = "AT+CIPSTART=0,\"TCP\",\"192.168.1.5\",6123"; //Connect as client
-const char cnd_send_packet[]= "AT+CIPSEND=0,10"; //Send packet
+const char cmd_send_packet[]= "AT+CIPSEND=0,10"; //Send packet
 const char a_message[]      = "Power=100W";
 
 void app_new(client i_esp_console i_esp){
