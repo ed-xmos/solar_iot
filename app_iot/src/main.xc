@@ -37,13 +37,18 @@ void app_new(client i_esp_console i_esp){
     printstrln (connect);
 
     memset(response, 0, RX_BUFFER_SIZE);
-    outcome = i_esp.send_cmd_ack(fw_info, response, 10);
+    outcome = send_cmd_ack(i_esp, fw_info, response, 10);
     event_to_text(outcome, outcome_msg);
     printf("Response: %s, outcome: %s\n", response, outcome_msg);
 
-    i_esp.send_cmd_noack(get_ip, 1);
+    i_esp.send_cmd_noack(list_ap, 2);
     memset(response, 0, RX_BUFFER_SIZE);
     outcome = esp_wait_for_event(i_esp, response);
+    event_to_text(outcome, outcome_msg);
+    printf("Response: %s, outcome: %s\n", response, outcome_msg);
+
+    memset(response, 0, RX_BUFFER_SIZE);
+    outcome = send_cmd_ack(i_esp, get_ip, response, 10);
     event_to_text(outcome, outcome_msg);
     printf("Response: %s, outcome: %s\n", response, outcome_msg);
 
