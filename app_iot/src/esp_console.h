@@ -27,8 +27,6 @@ typedef enum esp_result_t {
 } esp_result_t;
 
 typedef interface i_esp_console {
-  esp_event_t send_cmd_ack(const char * command, char * response, unsigned timeout_s);
-  esp_event_t send_cmd_search_ack(const char * command, char * response, char *search, unsigned timeout_s);
   void send_cmd_noack(const char * command, unsigned timeout_s);
   void send_cmd_search_noack(const char * command, char *search, unsigned timeout_s);
   esp_result_t get_buffer(char * response);
@@ -42,6 +40,7 @@ typedef interface i_esp_rx_server {
   [[clears_notification]] esp_event_t check_event(void);
 }i_esp_event;
 
+[[combinable]]
 void esp_console_task(server i_esp_console i_esp, client uart_tx_if i_uart_tx, client uart_rx_if i_uart_rx);
 esp_event_t esp_wait_for_event(client i_esp_console i_esp, char * response);
 void event_to_text(esp_event_t event, char * string);

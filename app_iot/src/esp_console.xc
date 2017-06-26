@@ -11,6 +11,7 @@
 #include "esp_console.h"
 #include "match.h"
 
+[[combinable]]
 void esp_console_task(server i_esp_console i_esp, client uart_tx_if i_uart_tx, client uart_rx_if i_uart_rx) {
 
     esp_event_t last_event = ESP_OK;
@@ -40,89 +41,6 @@ void esp_console_task(server i_esp_console i_esp, client uart_tx_if i_uart_tx, c
 
     while(1){
         select{
-            case i_esp.send_cmd_ack(const char * command, char * response, unsigned timeout_s) -> esp_event_t outcome:
-                for (int i = 0; i < strlen(command); i++) i_uart_tx.write(command[i]);
-                outcome = ESP_NO_EVENT;
-                i_uart_tx.write('\r');
-                i_uart_tx.write('\n');
-
-                int lf_found = 0;
-                int timed_out = 0;
-                int event = 0;
-                timeout_t :> timeout_trig;
-                timeout_trig += (timeout_s * SECOND_TICKS);
-                while (!event && !timed_out) {
-                    select{
-                        case i_uart_rx.data_ready():
-                            char rx = i_uart_rx.read();
-                            *response = rx;
-                            ++response;
-                            if (match_str(&error, rx)) {
-                                last_event = ESP_ERROR;
-                                event = 1;
-                            }
-                            if (match_str(&ok, rx)) {
-                                last_event = ESP_OK;
-                                event = 1;
-                            }
-                            if (match_str(&busy, rx)) {
-                                last_event = ESP_BUSY;
-                                event = 1;
-                            }
-                            if (match_str(&newline, rx)) ++lf_found;
-                            break;
-                        case timeout_t when timerafter(timeout_trig) :> void:
-                            timed_out = 1;
-                            break;
-                    }
-                }
-                outcome = last_event;
-                break;
-
-            case i_esp.send_cmd_search_ack(const char * command,  char * response,
-                    char * search_term, unsigned timeout_s)  -> esp_event_t outcome:
-                outcome = ESP_NO_EVENT;
-                for (int i = 0; i < strlen(command); i++) i_uart_tx.write(command[i]);
-                i_uart_tx.write('\r');
-                i_uart_tx.write('\n');
-                init_match(&custom, search_term);
-                int lf_found = 0;
-                int timed_out = 0;
-                int event = 0;
-                timeout_t :> timeout_trig;
-                timeout_trig += (timeout_s * SECOND_TICKS);
-                while (!event && !timed_out) {
-                    select{
-                        case i_uart_rx.data_ready():
-                            char rx = i_uart_rx.read();
-                            *response = rx;
-                            ++response;
-                            if (match_str(&error, rx)) {
-                                last_event = ESP_ERROR;
-                                event = 1;
-                            }
-                            if (match_str(&custom, rx)) {
-                                last_event = ESP_SEARCH_FOUND;
-                                event = 1;
-                            }
-                            if (match_str(&ok, rx)) {
-                                last_event = ESP_OK;
-                                event = 1;
-                            }
-                            if (match_str(&busy, rx)) {
-                                last_event = ESP_BUSY;
-                                event = 1;
-                            }
-                            if (match_str(&newline, rx)) ++lf_found;
-                            break;
-                        case timeout_t when timerafter(timeout_trig) :> void:
-                            timed_out = 1;
-                            break;
-                    }
-                }
-                outcome = last_event;
-                break;
-
             case i_esp.send_cmd_noack(const char * command, unsigned timeout_s):
                 for (int i = 0; i < strlen(command); i++) i_uart_tx.write(command[i]);
                 i_uart_tx.write('\r');
@@ -190,7 +108,6 @@ void esp_console_task(server i_esp_console i_esp, client uart_tx_if i_uart_tx, c
                     timer_enabled = 0;
                 }
                 break;
-
 
             case i_esp.get_buffer(char * rx_buff) -> esp_result_t is_buffer_lost:
                 strcpy(rx_buff, buffer[dbl_buff_idx ^ 1]); //get old buffer
