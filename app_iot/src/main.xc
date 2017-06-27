@@ -39,23 +39,24 @@ void app_new(client i_esp_console i_esp){
     memset(response, 0, RX_BUFFER_SIZE);
     outcome = send_cmd_ack(i_esp, fw_info, response, 1);
     event_to_text(outcome, outcome_msg);
-    printf("Response: %Outcome: %s\n", response, outcome_msg);
+    printf("Response: %sOutcome: %s\n", response, outcome_msg);
 
-    i_esp.send_cmd_noack(list_ap, 10);
     memset(response, 0, RX_BUFFER_SIZE);
+    i_esp.send_cmd_noack(list_ap, 10);
     outcome = esp_wait_for_event(i_esp, response);
     event_to_text(outcome, outcome_msg);
     printf("Response: %sOutcome: %s\n", response, outcome_msg);
 
     memset(response, 0, RX_BUFFER_SIZE);
-    outcome = send_cmd_ack(i_esp, get_ip, response, 1);
+    outcome = send_cmd_search_ack(i_esp, get_ip, response, "APIP", 1);
+    if (outcome == ESP_SEARCH_FOUND){
+        printf("**FOUND**");
+        outcome = esp_wait_for_event(i_esp, response);
+    }
     event_to_text(outcome, outcome_msg);
     printf("Response: %sOutcome: %s\n", response, outcome_msg);
 
-    while(1){
-        printf("**Finished test**\n");
-        delay_milliseconds(1000);
-    }
+    printf("**Finished test**\n");
 }
 
 /* "main" function that sets up two uarts, console and the application */

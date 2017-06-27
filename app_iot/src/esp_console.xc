@@ -39,8 +39,6 @@ void esp_console_task(server i_esp_console i_esp, client uart_tx_if i_uart_tx, c
     match_t newline;
     init_match(&newline, "\r\n");
 
-    printstrln("esp_console_task started\n");
-
     while(1){
         select{
             case i_esp.send_cmd_noack(const char * command, unsigned timeout_s):
@@ -86,7 +84,7 @@ void esp_console_task(server i_esp_console i_esp, client uart_tx_if i_uart_tx, c
                 if (is_custom) {
                     last_event_buff = ESP_SEARCH_FOUND;
                     last_event_read = ESP_SEARCH_FOUND;
-                    i_esp.esp_event();
+                    i_esp.esp_event(); //Extra event
                     break;
                 }
 
@@ -105,7 +103,7 @@ void esp_console_task(server i_esp_console i_esp, client uart_tx_if i_uart_tx, c
                 if ((      last_event_buff == ESP_OK
                         || last_event_buff == ESP_BUSY
                         || last_event_buff == ESP_ERROR)
-                        && is_newline) {
+                        && is_newline   ) {
                     //printstr( buffer[dbl_buff_idx]);
                     dbl_buff_idx ^= 1;  //Flip buffers
                     buffer[dbl_buff_idx][buff_idx] = 0; //string terminate new buffer
@@ -119,9 +117,11 @@ void esp_console_task(server i_esp_console i_esp, client uart_tx_if i_uart_tx, c
                 break;
 
             case i_esp.get_buffer(char * rx_buff) -> esp_result_t is_buffer_lost:
+                //printf("*gb*\n");
                 strcpy(rx_buff, buffer[dbl_buff_idx ^ 1]); //get old buffer
                 is_buffer_lost = buffer_lost ? ESP_BUFFER_LOST : ESP_BUFFER_OK;
                 buffer_read = 1;
+                //printstrln(rx_buff);
                 break;
 
             case timer_enabled => timeout_t when timerafter(timeout_trig) :> void:
@@ -146,6 +146,7 @@ esp_event_t esp_wait_for_event(client i_esp_console i_esp, char * response){
         case i_esp.esp_event():
             event = i_esp.check_event();
             i_esp.get_buffer(response);
+            //printstrln(response);
             break;
     }
     return event;
