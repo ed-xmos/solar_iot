@@ -14,7 +14,9 @@
 [[combinable]]
 void esp_console_task(server i_esp_console i_esp, client uart_tx_if i_uart_tx, client uart_rx_if i_uart_rx) {
 
-    esp_event_t last_event = ESP_OK;
+    //Two copies. One for reading by app and one for controlling buffer swap
+    esp_event_t last_event_buff = ESP_NO_EVENT;
+    esp_event_t last_event_read = ESP_NO_EVENT;
 
     char buffer[2][RX_BUFFER_SIZE] = {{0}};
     int dbl_buff_idx = 0;
@@ -65,7 +67,8 @@ void esp_console_task(server i_esp_console i_esp, client uart_tx_if i_uart_tx, c
                 break;
 
             case i_esp.check_event(void) -> esp_event_t event:
-                event = last_event;
+                event = last_event_read;
+                last_event_read = ESP_NO_EVENT;
                 break;
 
             case i_uart_rx.data_ready(void):
@@ -81,24 +84,28 @@ void esp_console_task(server i_esp_console i_esp, client uart_tx_if i_uart_tx, c
                 int is_error = match_str(&error, rx);
 
                 if (is_custom) {
-                    last_event = ESP_SEARCH_FOUND;
+                    last_event_buff = ESP_SEARCH_FOUND;
+                    last_event_read = ESP_SEARCH_FOUND;
                     i_esp.esp_event();
                     break;
                 }
 
                 if (is_error) {
-                    last_event = ESP_ERROR;
-                    i_esp.esp_event();
+                    last_event_buff = ESP_ERROR;
+                    last_event_read = ESP_ERROR;
                 }
                 if (is_busy) {
-                    last_event = ESP_BUSY;
-                    i_esp.esp_event();
+                    last_event_buff = ESP_BUSY;
+                    last_event_read = ESP_BUSY;
                 }
                 if (is_ok) {
-                    last_event = ESP_OK;
-                    i_esp.esp_event();
+                    last_event_buff = ESP_OK;
+                    last_event_read = ESP_OK;
                 }
-                if (is_ok || is_busy || is_error) {
+                if ((      last_event_buff == ESP_OK
+                        || last_event_buff == ESP_BUSY
+                        || last_event_buff == ESP_ERROR)
+                        && is_newline) {
                     //printstr( buffer[dbl_buff_idx]);
                     dbl_buff_idx ^= 1;  //Flip buffers
                     buffer[dbl_buff_idx][buff_idx] = 0; //string terminate new buffer
@@ -106,6 +113,8 @@ void esp_console_task(server i_esp_console i_esp, client uart_tx_if i_uart_tx, c
                     buffer_lost = (buffer_read == 0) ? 1 : 0;
                     buffer_read = 0;
                     timer_enabled = 0;
+                    i_esp.esp_event();
+                    last_event_buff = ESP_NO_EVENT;
                 }
                 break;
 
@@ -117,8 +126,8 @@ void esp_console_task(server i_esp_console i_esp, client uart_tx_if i_uart_tx, c
 
             case timer_enabled => timeout_t when timerafter(timeout_trig) :> void:
                 timer_enabled = 0;
-                last_event = ESP_TIMEOUT;
-                printstrln("timeout case");
+                last_event_read = ESP_TIMEOUT;
+                //printstrln("timeout case");
                 dbl_buff_idx ^= 1;  //Flip buffers
                 buffer[dbl_buff_idx][buff_idx] = 0; //string terminate new buffer
                 buff_idx = 0;
