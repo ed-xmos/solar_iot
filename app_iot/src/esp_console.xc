@@ -105,8 +105,9 @@ void esp_console_task(server i_esp_console i_esp, client uart_tx_if i_uart_tx, c
                         || last_event_buff == ESP_ERROR)
                         && is_newline   ) {
                     //printstr( buffer[dbl_buff_idx]);
-                    dbl_buff_idx ^= 1;  //Flip buffers
-                    buffer[dbl_buff_idx][buff_idx] = 0; //string terminate new buffer
+                    buffer[dbl_buff_idx][buff_idx] = 0; //string terminate old buffer
+                    dbl_buff_idx ^= 1;                  //Flip buffers
+                    buffer[dbl_buff_idx][0] = 0;        //string terminate new buffer
                     buff_idx = 0;
                     buffer_lost = (buffer_read == 0) ? 1 : 0;
                     buffer_read = 0;
