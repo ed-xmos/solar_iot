@@ -12,7 +12,7 @@
 #include "match.h"
 
 [[combinable]]
-void esp_console_task(server i_esp_console i_esp, client uart_tx_if i_uart_tx, client uart_rx_if i_uart_rx) {
+void esp_console_task(server i_esp_console i_esp, client uart_tx_if i_uart_tx, client uart_rx_if i_uart_rx ) {
 
     //Two copies. One for reading by app and one for controlling buffer swap
     esp_event_t last_event_buff = ESP_NO_EVENT;

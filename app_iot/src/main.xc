@@ -29,32 +29,31 @@ const char conn_client[]    = "AT+CIPSTART=0,\"TCP\",\"192.168.1.5\",6123"; //Co
 const char cmd_send_packet[]= "AT+CIPSEND=0,10"; //Send packet
 const char a_message[]      = "Power=100W";
 
+static void fail(esp_event_t outcome, char * response){
+    char outcome_msg[32];
+    event_to_text(outcome, outcome_msg);
+    printf("Response: %sOutcome: %s\n", response, outcome_msg);
+}
+
 void app_new(client i_esp_console i_esp){
     char response[RX_BUFFER_SIZE] = {0};
-    char outcome_msg[32] = {0};
     esp_event_t outcome;
 
-    //printstrln(connect);
 
-    memset(response, 0, RX_BUFFER_SIZE);
-    outcome = send_cmd_ack(i_esp, fw_info, response, 1);
-    event_to_text(outcome, outcome_msg);
-    printf("Response: %sOutcome: %s\n", response, outcome_msg);
+    if(ESP_OK != (outcome = send_cmd_ack(i_esp, fw_info, response, 1))) fail(outcome, response);
+    printf("Response: %s", response);
 
-    memset(response, 0, RX_BUFFER_SIZE);
     i_esp.send_cmd_noack(list_ap, 10);
-    outcome = esp_wait_for_event(i_esp, response);
-    event_to_text(outcome, outcome_msg);
-    printf("Response: %sOutcome: %s\n", response, outcome_msg);
+    if(ESP_OK != (outcome = esp_wait_for_event(i_esp, response))) fail(outcome, response);
+    printf("Response: %s", response);
 
-    memset(response, 0, RX_BUFFER_SIZE);
+
     outcome = send_cmd_search_ack(i_esp, get_ip, response, "APIP", 1);
     if (outcome == ESP_SEARCH_FOUND){
         printf("**FOUND**");
-        outcome = esp_wait_for_event(i_esp, response);
+        if(ESP_OK != (outcome = esp_wait_for_event(i_esp, response))) fail(outcome, response);
     }
-    event_to_text(outcome, outcome_msg);
-    printf("Response: %sOutcome: %s\n", response, outcome_msg);
+    printf("Response: %s", response);
 
     printf("**Finished test**\n");
 }
