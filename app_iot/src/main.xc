@@ -2,11 +2,11 @@
 #include <xs1.h>
 #include <platform.h>
 #include <print.h>
-#include <uart.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <uart.h>
 
 #include "match.h"
 #include "fifo.h"
@@ -22,7 +22,7 @@ port p_ch_pd   = on tile[0] : XS1_PORT_1I; //24
 const char fw_info[]        = "AT+GMR"; //Firmware info
 const char set_ap_mode[]    = "AT+CWMODE=3";  //AP & client
 const char list_ap[]        = "AT+CWLAP"; //List AP
-const char connect[]        = CONNECT;
+const char connect[]        = CONNECT;  //Defined in esp_console.h
 const char get_ip[]         = "AT+CIFSR"; //get IP address
 const char enable_conns[]   = "AT+CIPMUX=1";  //Enable multiple connections
 const char run_tcp_serv[]   = "AT+CIPSERVER=1,80"; //run a TCP server on port 80
@@ -49,6 +49,19 @@ static void do_esp_cmd(client i_esp_console i_esp, const char * cmd){
     if (outcome != ESP_OK) fail(outcome, response);
 }
 
+static void send_tcp(client i_esp_console i_esp, const char * pkt){
+    esp_event_t outcome;
+    char response[RX_BUFFER_SIZE];
+    char sendcmd[512];
+    sprintf(sendcmd, send_varlen, strlen(pkt) + 2);
+    outcome = send_cmd_ack(i_esp, sendcmd, response, 1);
+    printf("Response: %s", response);
+    if (outcome != ESP_OK) fail(outcome, response);
+    outcome = send_cmd_ack(i_esp, pkt, response, 1);
+    printf("Response: %s", response);
+    if (outcome != ESP_OK) fail(outcome, response);
+}
+
 void app_new(client i_esp_console i_esp){
     char response[RX_BUFFER_SIZE] = {0};
     //esp_event_t outcome;
@@ -60,19 +73,14 @@ void app_new(client i_esp_console i_esp){
 
     do_esp_cmd(i_esp, enable_conns);
     char sendstr[1024];
-    char sendcmd[1024];
-    char msg[]="field1=169";
+
+    char msg[]="field1=144";
     do_esp_cmd(i_esp, conn_thingspeak);
-    //do_esp_cmd(i_esp, send_open_ended);
-    //delay_seconds(2);
     sprintf(sendstr, update_thingspeak, strlen(msg));
-    sprintf(sendcmd, send_varlen, strlen(sendstr) + 2);
-    do_esp_cmd(i_esp, sendcmd);
-    //delay_seconds(1);
-    do_esp_cmd(i_esp, sendstr);
-    sprintf(sendcmd, send_varlen, strlen(msg) + 2);
-    do_esp_cmd(i_esp, sendcmd);
-    do_esp_cmd(i_esp, msg);
+
+    send_tcp(i_esp, sendstr);
+    send_tcp(i_esp, msg);
+
     do_esp_cmd(i_esp, "AT");
     do_esp_cmd(i_esp, "AT");
     do_esp_cmd(i_esp, conn_close);
