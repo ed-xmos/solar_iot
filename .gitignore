@@ -6,4 +6,4 @@ org.eclipse.cdt.core.prefs
 *.
 .cproject
 .project
-ap_login.h
+credentials.h
