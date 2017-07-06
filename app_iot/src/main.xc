@@ -28,17 +28,22 @@ const char enable_conns[]   = "AT+CIPMUX=1";  //Enable multiple connections
 const char run_tcp_serv[]   = "AT+CIPSERVER=1,80"; //run a TCP server on port 80
 const char conn_client[]    = "AT+CIPSTART=0,\"TCP\",\"192.168.1.4\",6123"; //Connect as client
 const char cmd_send_packet[]= "AT+CIPSEND=0,10"; //Send packet
+const char conn_thingspeak[]= "AT+CIPSTART=0,\"TCP\",\"api.thingspeak.com\",80"; //Connect to thingspeak
+const char conn_close[]     = "AT+CIPCLOSE=0";
+const char send_varlen[]= "AT+CIPSEND=0,%d";
+const char update_thingspeak[] = "POST /update HTTP/1.1\nHost: api.thingspeak.com\nConnection: close\nX-THINGSPEAKAPIKEY: " THINGSPEAKEYSTR "\nContent-Type: application/x-www-form-urlencoded\nContent-Length: %d\n";
 const char a_message[]      = "Power=100W";
 
 static void fail(esp_event_t outcome, char * response){
     char outcome_msg[32];
     event_to_text(outcome, outcome_msg);
-    printf("Response: %sOutcome: %s\n", response, outcome_msg);
+    printf("Outcome: %s, Response: %s\n", outcome_msg, response);
     //_Exit(-1);
 }
 
-static void do_esp(client i_esp_console i_esp, const char * cmd, char * response){
+static void do_esp_cmd(client i_esp_console i_esp, const char * cmd){
     esp_event_t outcome;
+    char response[RX_BUFFER_SIZE];
     outcome = send_cmd_ack(i_esp, cmd, response, 10);
     printf("Response: %s", response);
     if (outcome != ESP_OK) fail(outcome, response);
@@ -48,18 +53,32 @@ void app_new(client i_esp_console i_esp){
     char response[RX_BUFFER_SIZE] = {0};
     //esp_event_t outcome;
 
-    do_esp(i_esp, set_ap_mode, response);
-    do_esp(i_esp, list_ap, response);
-    do_esp(i_esp, connect, response);
-    do_esp(i_esp, get_ip, response);
+    //do_esp_cmd(i_esp, set_ap_mode);
+    //do_esp_cmd(i_esp, list_ap);
+    //do_esp_cmd(i_esp, connect);
+    do_esp_cmd(i_esp, get_ip);
 
-    do_esp(i_esp, enable_conns, response);
-    do_esp(i_esp, conn_client, response);
+    do_esp_cmd(i_esp, enable_conns);
+    char sendstr[1024];
+    char sendcmd[1024];
+    char msg[]="field1=169";
+    do_esp_cmd(i_esp, conn_thingspeak);
+    //do_esp_cmd(i_esp, send_open_ended);
+    //delay_seconds(2);
+    sprintf(sendstr, update_thingspeak, strlen(msg));
+    sprintf(sendcmd, send_varlen, strlen(sendstr) + 2);
+    do_esp_cmd(i_esp, sendcmd);
+    //delay_seconds(1);
+    do_esp_cmd(i_esp, sendstr);
+    sprintf(sendcmd, send_varlen, strlen(msg) + 2);
+    do_esp_cmd(i_esp, sendcmd);
+    do_esp_cmd(i_esp, msg);
+    do_esp_cmd(i_esp, "AT");
+    do_esp_cmd(i_esp, "AT");
+    do_esp_cmd(i_esp, conn_close);
 
-    do_esp(i_esp, cmd_send_packet, response);
-    do_esp(i_esp, a_message, response);
 
-    do_esp(i_esp, run_tcp_serv, response);
+    //do_esp_cmd(i_esp, run_tcp_serv);
 
 #if 0
     i_esp.send_cmd_noack(list_ap, 10);

@@ -11,6 +11,8 @@
 #include "esp_console.h"
 #include "match.h"
 
+#define DEBUG_MSGS  0
+
 [[combinable]]
 void esp_console_task(server i_esp_console i_esp, client uart_tx_if i_uart_tx, client uart_rx_if i_uart_rx ) {
 
@@ -45,6 +47,9 @@ void esp_console_task(server i_esp_console i_esp, client uart_tx_if i_uart_tx, c
                 for (int i = 0; i < strlen(command); i++) i_uart_tx.write(command[i]);
                 i_uart_tx.write('\r');
                 i_uart_tx.write('\n');
+#if DEBUG_MSGS
+                printf("<<%s\n", command);
+#endif
                 if (timeout_s) {
                     timeout_t :> timeout_trig;
                     timeout_trig += (timeout_s * SECOND_TICKS);
@@ -72,7 +77,9 @@ void esp_console_task(server i_esp_console i_esp, client uart_tx_if i_uart_tx, c
             case i_uart_rx.data_ready(void):
                 //printstrln("i_uart_rx.data_ready");
                 char rx = i_uart_rx.read();
-                //putchar(rx);
+#if DEBUG_MSGS
+                putchar(rx);
+#endif
                 buffer[dbl_buff_idx][buff_idx] = rx;
                 ++buff_idx;
                 int is_newline = match_str(&newline, rx);

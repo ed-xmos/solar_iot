@@ -13,6 +13,6 @@
 #define RX_BUFFER_SIZE 4096
 #define SECOND_TICKS   100000000
 
-#include "ap_login.h"   //File cotaining #define SSID <my-ssid> and #define PASSWORD <my-ap-passord>
+#include "credentials.h"   //File cotaining #define SSID <my-ssid> and #define PASSWORD <my-ap-passord> and #define THINGSPEAKEY  <key>
 
 #endif /* APP_SETTINGS_H_ */
