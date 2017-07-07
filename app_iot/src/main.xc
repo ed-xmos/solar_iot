@@ -31,8 +31,10 @@ const char cmd_send_packet[]= "AT+CIPSEND=0,10"; //Send packet
 const char conn_thingspeak[]= "AT+CIPSTART=0,\"TCP\",\"api.thingspeak.com\",80"; //Connect to thingspeak
 const char conn_close[]     = "AT+CIPCLOSE=0";
 const char send_varlen[]= "AT+CIPSEND=0,%d";
-const char update_thingspeak[] = "POST /update HTTP/1.1\nHost: api.thingspeak.com\nConnection: close\nX-THINGSPEAKAPIKEY: " THINGSPEAKEYSTR "\nContent-Type: application/x-www-form-urlencoded\nContent-Length: %d\n";
+const char update_thingspeak[] = "POST /update HTTP/1.1\nHost: api.thingspeak.com\nConnection: close\nX-THINGSPEAKAPIKEY: " THINGSPEAKKEYSTR "\nContent-Type: application/x-www-form-urlencoded\nContent-Length: %d\n";
 const char a_message[]      = "Power=100W";
+const char msg_unformatted[]="field1=%d&field2=%d&field3=%d&field4=%.2f&field5=%.2f&field6=%.1f";
+
 
 static void fail(esp_event_t outcome, char * response){
     char outcome_msg[32];
@@ -62,45 +64,38 @@ static void send_tcp(client i_esp_console i_esp, const char * pkt){
     if (outcome != ESP_OK) fail(outcome, response);
 }
 
-void app_new(client i_esp_console i_esp){
+void app(client i_esp_console i_esp){
     char response[RX_BUFFER_SIZE] = {0};
-    //esp_event_t outcome;
+    char msg[256] = {0};
 
-    //do_esp_cmd(i_esp, set_ap_mode);
-    //do_esp_cmd(i_esp, list_ap);
-    //do_esp_cmd(i_esp, connect);
+    unsigned power = 0;
+    unsigned peak_power = 0;
+    unsigned yield = 0;
+
+    float v_batt = 0;
+    float i_batt = 0;
+    float efficiency = 0;
+
+    power = 85;
+    peak_power = 120;
+
+    v_batt = 13.6124;
+    i_batt = 0.42765;
+    efficiency = 92.2142;
+
     do_esp_cmd(i_esp, get_ip);
-
     do_esp_cmd(i_esp, enable_conns);
-    char sendstr[1024];
 
-    char msg[]="field1=144";
-    do_esp_cmd(i_esp, conn_thingspeak);
-    sprintf(sendstr, update_thingspeak, strlen(msg));
+    char sendstr[512];
+    sprintf(msg, msg_unformatted, power, peak_power, yield, i_batt, v_batt, efficiency); //Create the payload
+    sprintf(sendstr, update_thingspeak, strlen(msg)); //Format the update message with msg length
 
-    send_tcp(i_esp, sendstr);
-    send_tcp(i_esp, msg);
+    do_esp_cmd(i_esp, conn_thingspeak); //Open TCP
 
-    do_esp_cmd(i_esp, "AT");
-    do_esp_cmd(i_esp, "AT");
-    do_esp_cmd(i_esp, conn_close);
+    send_tcp(i_esp, sendstr);   //start sending
+    send_tcp(i_esp, msg);       //payload
 
-
-    //do_esp_cmd(i_esp, run_tcp_serv);
-
-#if 0
-    i_esp.send_cmd_noack(list_ap, 10);
-    if(ESP_OK != (outcome = esp_wait_for_event(i_esp, response))) fail(outcome, response);
-    printf("Response: %s", response);
-
-    outcome = send_cmd_search_ack(i_esp, get_ip, response, "APIP", 1);
-    if (outcome == ESP_SEARCH_FOUND){
-        printf("**FOUND**");
-        if(ESP_OK != (outcome = esp_wait_for_event(i_esp, response))) fail(outcome, response);
-    }
-    printf("Response: %s", response);
-#endif
-
+    do_esp_cmd(i_esp, conn_close);  //Close TCP
     printf("**Finished test**\n");
 
     while(1){
@@ -126,7 +121,7 @@ int main() {
                                  BAUD_RATE, UART_PARITY_NONE, 8, 1,
                                  i_gpio_rx);
 
-    on tile[0]: app_new(i_esp);
+    on tile[0]: app(i_esp);
     on tile[0]: esp_console_task(i_esp, i_tx, i_rx);
   }
   return 0;

@@ -18,7 +18,7 @@
 #define CN1         "\",\""
 #define CN2         "\""
 #define CONNECT     CN0 xstr(SSID) CN1 xstr(PASSWORD) CN2
-#define THINGSPEAKEYSTR xstr(THINGSPEAKEY)
+#define THINGSPEAKKEYSTR xstr(THINGSPEAKKEY)
 
 typedef enum esp_event_t {
   ESP_OK = 0,
