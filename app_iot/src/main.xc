@@ -21,6 +21,7 @@ port p_ch_pd   = on tile[0] : XS1_PORT_1I; //24 pull down output only
 port p_uart_solar_rx = on tile[0] : XS1_PORT_1J;//25
 
 const char fw_info[]        = "AT+GMR"; //Firmware info
+const char reset[]          = "AT+RST"; //Restart ends with "ready"
 const char set_ap_mode[]    = "AT+CWMODE=3";  //AP & client
 const char list_ap[]        = "AT+CWLAP"; //List AP
 const char connect[]        = CONNECT;  //Defined in esp_console.h
@@ -33,9 +34,9 @@ const char conn_thingspeak[]= "AT+CIPSTART=0,\"TCP\",\"api.thingspeak.com\",80";
 const char conn_close[]     = "AT+CIPCLOSE=0";
 const char send_varlen[]= "AT+CIPSEND=0,%d";
 const char update_thingspeak[] = "POST /update HTTP/1.1\nHost: api.thingspeak.com\nConnection: close\nX-THINGSPEAKAPIKEY: " THINGSPEAKKEYSTR "\nContent-Type: application/x-www-form-urlencoded\nContent-Length: %d\n";
-const char msg_unformatted[]="field1=%d&field2=%d&field3=%d&field4=%.2f&field5=%.2f&field6=%.1f";
+const char msg_unformatted[]="field1=%d&field2=%d&field3=%d&field4=%d&field5=%d&field6=%d";
 
-const char mppt[] = "\r\nPID\t0xA043\r\nFW\t116\r\nSER#\tHQ1517557PE\r\nV\t13470\r\nI\t0\r\nVPV\t0\r\nPPV\t0\r\nCS\t0\r\nERR\t0\r\nLOAD\tON\r\nIL\t0\r\nH19\t0\r\nH20\t0\r\nH21\t222\r\nH22\t0\r\nH23\t0\r\nHSDS\t0\r\nChecksum\t'184'\r\n";
+char mppt[] = "\r\nPID\t0xA043\r\nFW\t116\r\nSER#\tHQ1517557PE\r\nV\t13470\r\nI\t140\r\nVPV\t32100\r\nPPV\t20\r\nCS\t0\r\nERR\t0\r\nLOAD\tON\r\nIL\t2320\r\nH19\t0\r\nH20\t30\r\nH21\t222\r\nH22\t0\r\nH23\t0\r\nHSDS\t0\r\nChecksum\t'184'\r\n";
 
 static void fail(esp_event_t outcome, char * response){
     char outcome_msg[32];
@@ -48,7 +49,7 @@ static void do_esp_cmd(client i_esp_console i_esp, const char * cmd){
     esp_event_t outcome;
     char response[RX_BUFFER_SIZE];
     outcome = send_cmd_ack(i_esp, cmd, response, 10);
-    printf("Response: %s", response);
+    printf("Cmd: %s Response: %s", cmd, response);
     if (outcome != ESP_OK) fail(outcome, response);
 }
 
@@ -65,13 +66,35 @@ static void send_tcp(client i_esp_console i_esp, const char * pkt){
     if (outcome != ESP_OK) fail(outcome, response);
 }
 
-int process_line(const char * field, const char * line){
-    int ret = -1;
+// Update the value if
+unsigned process_line(const char * field, const char * line, unsigned current){
+    unsigned ret = current;
     char * outcome = strstr(line, field);
-    if (*outcome) ret = atoi(outcome + strlen(field) + 1);
+    if (outcome && (outcome == line)) {
+        ret = atoi(outcome + strlen(field));
+        printf("field: %s val: %d\n", field, ret);
+    }
     return ret;
 }
 
+
+unsigned power = 0;
+unsigned peak_power = 0;
+unsigned yield = 0;
+unsigned v_batt_mv = 0;
+unsigned i_batt_ma = 0;
+unsigned efficiency_2dp = 0;
+unsigned i_load_ma = 0;
+
+unsafe{
+    volatile unsigned * unsafe power_ptr = &power;
+    volatile unsigned * unsafe peak_power_ptr = &peak_power;
+    volatile unsigned * unsafe yield_ptr = &yield;
+    volatile unsigned * unsafe v_batt_mv_ptr = &v_batt_mv;
+    volatile unsigned * unsafe i_batt_ma_ptr = &i_batt_ma;
+    volatile unsigned * unsafe efficiency_2dp_ptr = &efficiency_2dp;
+    volatile unsigned * unsafe i_load_ma_ptr = &i_load_ma;
+}
 
 void solar_decoder(client uart_rx_if i_uart_rx){
     match_t newline;
@@ -79,26 +102,37 @@ void solar_decoder(client uart_rx_if i_uart_rx){
     char line[SOLAR_RX_BUFFER_SIZE];
     unsigned line_idx = 0;
 
+    char * str = mppt;
+
     while(1){
         select{
-            case i_uart_rx.data_ready(void):
-                char rx = i_uart_rx.read();
+            //case i_uart_rx.data_ready(void):
+            default:
+                delay_milliseconds(1000);
+                //char rx = i_uart_rx.read();
+                char rx = *str; ++str; if (str == (mppt + strlen(mppt))) str = mppt;
+                //printchar(rx);
                 line[line_idx] = rx;
                 ++line_idx;
                 if(line_idx == SOLAR_RX_BUFFER_SIZE){
-                    printf("Solar line overflow: %s\n");
+                    printf("Solar line overflow: %s\n", line);
                     line_idx = 0;
                 }
                 int is_newline = match_str(&newline, rx);
                 if (is_newline){
                     line[line_idx] = 0;
-                    unsigned power          = process_line("PPV", line);
-                    unsigned peak_power     = process_line("H21", line);
-                    unsigned yield          = process_line("H20", line);
-                    unsigned v_batt_mv      = process_line("V", line);
-                    unsigned i_batt_ma      = process_line("I", line);
-                    unsigned i_load_ma      = process_line("IL", line);
-                    unsigned efficiency_2dp = power / (((i_load_ma + i_batt_ma) * v_batt_mv) / 10000);
+                    line_idx = 0;
+                    unsafe{
+                        *power_ptr          = process_line("PPV\t", line, *power_ptr);
+                        *peak_power_ptr     = process_line("H21\t", line, *peak_power_ptr);
+                        *yield_ptr          = process_line("H20\t", line, *yield_ptr);
+                        *v_batt_mv_ptr      = process_line("V\t", line, *v_batt_mv_ptr);
+                        *i_batt_ma_ptr      = process_line("I\t", line, *i_batt_ma_ptr);
+                        *i_load_ma_ptr      = process_line("IL\t", line, *i_load_ma_ptr);
+                        unsigned tmp = (((*i_load_ma_ptr + *i_batt_ma_ptr) * *v_batt_mv_ptr) / 10000);
+                        if (tmp) *efficiency_2dp_ptr = *power_ptr / tmp; //Avoid divide by zero
+                        else *efficiency_2dp_ptr = 0;
+                    }
                 }
                 break;
         }
@@ -109,13 +143,7 @@ void app(client i_esp_console i_esp){
     char response[RX_BUFFER_SIZE] = {0};
     char msg[TX_BUFFER_SIZE] = {0};
 
-    unsigned power = 0;
-    unsigned peak_power = 0;
-    unsigned yield = 0;
-
-    unsigned v_batt_mv = 0;
-    unsigned i_batt_ma = 0;
-    unsigned efficiency_2dp = 0;
+    printf("**Test started**\n");
 
     power = 85;
     peak_power = 120;
@@ -123,6 +151,23 @@ void app(client i_esp_console i_esp){
     v_batt_mv = 13640;
     i_batt_ma = 423;
     efficiency_2dp = 9221;
+
+    for (int i = 0; i < 10; ++i){
+        char event_type[32];
+
+        esp_event_t event = ESP_NO_EVENT;
+        while (event != ESP_OK){
+            i_esp.send_cmd_search_noack(reset, "ready", 10);
+            event = esp_wait_for_event(i_esp, response);
+            event_to_text(event, event_type);
+            printf("RST EVENT: %s\n", event_type);
+        }
+        event = esp_wait_for_event_timeout(i_esp, response,5);
+        event_to_text(event, event_type);
+        printf("RST EVENT: %s\n", event_type);
+        if (event == ESP_SEARCH_FOUND) break;
+        delay_seconds(5);
+    }
 
     do_esp_cmd(i_esp, get_ip);
     do_esp_cmd(i_esp, enable_conns);
@@ -135,8 +180,8 @@ void app(client i_esp_console i_esp){
 
     do_esp_cmd(i_esp, conn_thingspeak); //Open TCP
 
-    send_tcp(i_esp, sendstr);   //start sending
-    send_tcp(i_esp, msg);       //payload
+    send_tcp(i_esp, sendstr);       //start sending
+    send_tcp(i_esp, msg);           //payload
 
     do_esp_cmd(i_esp, conn_close);  //Close TCP
     printf("**Finished test**\n");
