@@ -160,6 +160,28 @@ esp_event_t esp_wait_for_event(client i_esp_console i_esp, char * response){
     return event;
 }
 
+esp_event_t esp_wait_for_event_timeout(client i_esp_console i_esp, char * response, unsigned timeout_s){
+    esp_event_t event;
+    timer t;
+    int timeout_time;
+
+    t:> timeout_time;
+    timeout_time += (SECOND_TICKS * timeout_s);
+    select{
+        case i_esp.esp_event():
+            event = i_esp.check_event();
+            i_esp.get_buffer(response);
+            //printstrln(response);
+            break;
+
+        case t when timerafter(timeout_time) :> void:
+            event = ESP_TIMEOUT;
+            break;
+    }
+    return event;
+}
+
+
 esp_event_t send_cmd_ack(client i_esp_console i_esp, const char * command, char * response, unsigned timeout_s){
     i_esp.send_cmd_noack(command, timeout_s);
     return esp_wait_for_event(i_esp, response);

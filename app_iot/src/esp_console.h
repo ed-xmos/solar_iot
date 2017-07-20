@@ -95,7 +95,7 @@ typedef interface i_esp_console {
 */
 void esp_console_task(server i_esp_console i_esp, client uart_tx_if i_uart_tx, client uart_rx_if i_uart_rx);
 
-/** Wait until we get an event from ESP8266 (or timeout)
+/** Wait until we get an event from ESP8266
 *
 * Selects on response from ESP8266. Receives last UART rx buffer. Client side function.
 *
@@ -103,6 +103,15 @@ void esp_console_task(server i_esp_console i_esp, client uart_tx_if i_uart_tx, c
 * \param response           Pointer to string to be written to with buffer
 */
 esp_event_t esp_wait_for_event(client i_esp_console i_esp, char * response);
+
+/** Wait until we get an event from ESP8266 (or timeout)
+*
+* Selects on response from ESP8266. Receives last UART rx buffer. Client side function.
+*
+* \param i_esp              client connection to console
+* \param response           Pointer to string to be written to with buffer
+*/
+esp_event_t esp_wait_for_event_timeout(client i_esp_console i_esp, char * response, unsigned timeout_s);
 
 /** Turns the esp_event_t enum into a string for printing
 *
