@@ -11,6 +11,7 @@
 #include "match.h"
 #include "fifo.h"
 #include "esp_console.h"
+#include "random.h"
 
 #include "app_settings.h"
 
@@ -97,6 +98,7 @@ unsafe{
 }
 
 void solar_sim(client uart_tx_if i_uart_tx){
+#if FIXED_STRING
     char * str = mppt;
     while(1){
         char tx = *str;
@@ -105,6 +107,36 @@ void solar_sim(client uart_tx_if i_uart_tx){
         if (str == (mppt + strlen(mppt))) str = mppt;
         delay_milliseconds(500);
     }
+#else
+    random_generator_t my_rand = random_create_generator_from_hw_seed();
+    while(1){
+        unsigned spower = 100 + (random_get_random_number(my_rand) % 30);
+        unsigned speak_power = 0;
+        unsigned syield = 0;
+        unsigned sv_batt_mv = 13000 + (random_get_random_number(my_rand) % 100);
+        unsigned si_batt_ma = 1000 + (random_get_random_number(my_rand) % 1000);
+        unsigned sefficiency_2dp = 0;
+        unsigned si_load_ma = 2000 + (random_get_random_number(my_rand) % 1000);
+
+        char tx_str[64];
+        tx_str[0] = 0;
+
+
+        sprintf(tx_str, "IL\t%d\r\n", si_load_ma);
+        for (int i = 0; i < strlen(tx_str); ++i) i_uart_tx.write(tx_str[i]);
+
+        sprintf(tx_str, "PPV\t%d\r\n", spower);
+        for (int i = 0; i < strlen(tx_str); ++i) i_uart_tx.write(tx_str[i]);
+
+        sprintf(tx_str, "I\t%d\r\n", si_batt_ma);
+        for (int i = 0; i < strlen(tx_str); ++i) i_uart_tx.write(tx_str[i]);
+
+        sprintf(tx_str, "V\t%d\r\n", v_batt_mv_ptr);
+        for (int i = 0; i < strlen(tx_str); ++i) i_uart_tx.write(tx_str[i]);
+
+        delay_seconds(5);
+    }
+#endif
 }
 
 

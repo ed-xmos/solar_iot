@@ -18,11 +18,11 @@ APP_NAME =
 # If the variable XCC_MAP_FLAGS is set it overrides the flags passed to
 # xcc for the final link (mapping) stage.
 
-XCC_FLAGS = -Os -g -report
+XCC_FLAGS = -Os -g -report -DRANDOM_ENABLE_HW_SEED=1
 
 # The USED_MODULES variable lists other module used by the application.
 
-USED_MODULES = lib_uart lib_logging
+USED_MODULES = lib_uart lib_logging module_random
 
 #=============================================================================
 # The following part of the Makefile includes the common build infrastructure
