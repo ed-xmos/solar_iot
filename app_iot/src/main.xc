@@ -15,10 +15,10 @@
 #include "app_settings.h"
 
 // Port declarations
-port p_uart_rx = on tile[0] : XS1_PORT_1G; //22
-port p_uart_tx = on tile[0] : XS1_PORT_1H; //23
-port p_ch_pd   = on tile[0] : XS1_PORT_1I; //24 pull down output only
-port p_uart_solar_rx = on tile[0] : XS1_PORT_1J;//25
+port p_uart_rx = on tile[0] : XS1_PORT_1E; //12
+port p_uart_tx = on tile[0] : XS1_PORT_1F; //13
+port p_uart_solar_rx = on tile[0] : XS1_PORT_1G;//22
+port p_uart_solar_tx = on tile[0] : XS1_PORT_1H;//23
 
 const char fw_info[]        = "AT+GMR"; //Firmware info
 const char reset[]          = "AT+RST"; //Restart ends with "ready"
@@ -96,21 +96,28 @@ unsafe{
     volatile unsigned * unsafe i_load_ma_ptr = &i_load_ma;
 }
 
+void solar_sim(client uart_tx_if i_uart_tx){
+    char * str = mppt;
+    while(1){
+        char tx = *str;
+        i_uart_tx.write(tx);
+        ++str;
+        if (str == (mppt + strlen(mppt))) str = mppt;
+        delay_milliseconds(500);
+    }
+}
+
+
 void solar_decoder(client uart_rx_if i_uart_rx){
     match_t newline;
     init_match(&newline, "\r\n");
     char line[SOLAR_RX_BUFFER_SIZE];
     unsigned line_idx = 0;
 
-    char * str = mppt;
-
     while(1){
         select{
-            //case i_uart_rx.data_ready(void):
-            default:
-                delay_milliseconds(1000);
-                //char rx = i_uart_rx.read();
-                char rx = *str; ++str; if (str == (mppt + strlen(mppt))) str = mppt;
+            case i_uart_rx.data_ready(void):
+                char rx = i_uart_rx.read();
                 //printchar(rx);
                 line[line_idx] = rx;
                 ++line_idx;
@@ -145,6 +152,7 @@ void app(client i_esp_console i_esp){
 
     printf("**Test started**\n");
 
+    //Init values
     power = 85;
     peak_power = 120;
 
@@ -152,7 +160,8 @@ void app(client i_esp_console i_esp){
     i_batt_ma = 423;
     efficiency_2dp = 9221;
 
-    for (int i = 0; i < 10; ++i){
+    //Try 10 resets
+    for (int i = 0; i < 0; ++i){
         char event_type[32];
 
         esp_event_t event = ESP_NO_EVENT;
@@ -169,26 +178,30 @@ void app(client i_esp_console i_esp){
         delay_seconds(5);
     }
 
-    do_esp_cmd(i_esp, get_ip);
+    //do_esp_cmd(i_esp, get_ip);
+
+    while(0){
+        delay_seconds(3);
+        do_esp_cmd(i_esp, list_ap);
+    }
+    do_esp_cmd(i_esp, connect);
     do_esp_cmd(i_esp, enable_conns);
 
-    char sendstr[TX_BUFFER_SIZE];
-    sprintf(msg, msg_unformatted, power, peak_power, yield, i_batt_ma, v_batt_mv, efficiency_2dp); //Create the payload
-    sprintf(sendstr, update_thingspeak, strlen(msg)); //Format the update message with msg length
-
-    printf("sendstr.len=%d", strlen(sendstr));
-
-    do_esp_cmd(i_esp, conn_thingspeak); //Open TCP
-
-    send_tcp(i_esp, sendstr);       //start sending
-    send_tcp(i_esp, msg);           //payload
-
-    do_esp_cmd(i_esp, conn_close);  //Close TCP
-    printf("**Finished test**\n");
-
     while(1){
-        esp_wait_for_event(i_esp, response);
-        printf("Response: %s", response);
+        char sendstr[TX_BUFFER_SIZE];
+        sprintf(msg, msg_unformatted, power, peak_power, yield, i_batt_ma, v_batt_mv, efficiency_2dp); //Create the payload
+        sprintf(sendstr, update_thingspeak, strlen(msg)); //Format the update message with msg length
+
+        //printf("sendstr.len=%d", strlen(sendstr));
+
+        do_esp_cmd(i_esp, conn_thingspeak); //Open TCP
+
+        send_tcp(i_esp, sendstr);       //start sending
+        send_tcp(i_esp, msg);           //payload
+
+        do_esp_cmd(i_esp, conn_close);  //Close TCP
+
+        delay_seconds(30);
     }
 }
 
@@ -196,31 +209,43 @@ void app(client i_esp_console i_esp){
 int main() {
   interface uart_rx_if i_rx;
   interface uart_tx_if i_tx;
+
   input_gpio_if i_gpio_rx;
   output_gpio_if i_gpio_tx[1];
 
   interface uart_rx_if i_solar_rx;
   input_gpio_if i_gpio_solar_rx;
 
+  interface uart_tx_if i_solar_tx;
+  output_gpio_if i_gpio_solar_tx[1];
+
+
   i_esp_console i_esp;
   par {
+    
     on tile[0]: output_gpio(i_gpio_tx, 1, p_uart_tx, null);
     on tile[0]: uart_tx(i_tx, null,
                         BAUD_RATE, UART_PARITY_NONE, 8, 1, i_gpio_tx[0]);
+    
     on tile[0].core[0] : input_gpio_1bit_with_events(i_gpio_rx, p_uart_rx);
     on tile[0].core[0] : uart_rx(i_rx, null, RX_BUFFER_SIZE,
                                  BAUD_RATE, UART_PARITY_NONE, 8, 1,
                                  i_gpio_rx);
-
-    on tile[0].core[0] : input_gpio_1bit_with_events(i_gpio_solar_rx, p_uart_solar_rx);
-    on tile[0].core[0] : uart_rx(i_solar_rx, null, SOLAR_RX_BUFFER_SIZE,
+    
+    on tile[0].core[1] : input_gpio_1bit_with_events(i_gpio_solar_rx, p_uart_solar_rx);
+    on tile[0].core[1] : uart_rx(i_solar_rx, null, SOLAR_RX_BUFFER_SIZE,
                                  SOLAR_BAUD_RATE, UART_PARITY_NONE, 8, 1,
                                  i_gpio_solar_rx);
-
+    
     on tile[0]: app(i_esp);
     on tile[0]: esp_console_task(i_esp, i_tx, i_rx);
 
     on tile[0]: solar_decoder(i_solar_rx);
+
+    on tile[0]: solar_sim(i_solar_tx);
+    on tile[0]: output_gpio(i_gpio_solar_tx, 1, p_uart_solar_tx, null);
+    on tile[0]: uart_tx(i_solar_tx, null,
+                        SOLAR_BAUD_RATE, UART_PARITY_NONE, 8, 1, i_gpio_solar_tx[0]);
   }
   return 0;
 }
