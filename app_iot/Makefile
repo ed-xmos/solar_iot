@@ -22,7 +22,7 @@ XCC_FLAGS = -Os -g -report -DRANDOM_ENABLE_HW_SEED=1
 
 # The USED_MODULES variable lists other module used by the application.
 
-USED_MODULES = lib_uart lib_logging module_random
+USED_MODULES = lib_uart lib_logging module_random lib_spi
 
 #=============================================================================
 # The following part of the Makefile includes the common build infrastructure

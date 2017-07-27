@@ -5,21 +5,28 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
-#include <stdlib.h>
 #include <uart.h>
 
 #include "match.h"
-#include "fifo.h"
 #include "esp_console.h"
-#include "random.h"
+#include "solar.h"
+#include "spi.h"
 
 #include "app_settings.h"
 
-// Port declarations
+// Port declarations ESP8266
 port p_uart_rx = on tile[0] : XS1_PORT_1E; //12
 port p_uart_tx = on tile[0] : XS1_PORT_1F; //13
+
+// Port declarations for MPPT Solar module
 port p_uart_solar_rx = on tile[0] : XS1_PORT_1G;//22
 port p_uart_solar_tx = on tile[0] : XS1_PORT_1H;//23
+
+// Port declarations LED
+on tile[0] : out port p_spi_ss[1]           = {XS1_PORT_1A}; //00
+on tile[0] : out buffered port:32 p_spi_clk = XS1_PORT_1B; //01
+on tile[0] : out buffered port:32 p_spi_da  = XS1_PORT_1C; //10
+on tile[0] : clock clk_spi                  = XS1_CLKBLK_1;
 
 const char fw_info[]        = "AT+GMR"; //Firmware info
 const char reset[]          = "AT+RST"; //Restart ends with "ready"
@@ -37,7 +44,14 @@ const char send_varlen[]= "AT+CIPSEND=0,%d";
 const char update_thingspeak[] = "POST /update HTTP/1.1\nHost: api.thingspeak.com\nConnection: close\nX-THINGSPEAKAPIKEY: " THINGSPEAKKEYSTR "\nContent-Type: application/x-www-form-urlencoded\nContent-Length: %d\n";
 const char msg_unformatted[]="field1=%d&field2=%d&field3=%d&field4=%d&field5=%d&field6=%d";
 
-char mppt[] = "\r\nPID\t0xA043\r\nFW\t116\r\nSER#\tHQ1517557PE\r\nV\t13470\r\nI\t140\r\nVPV\t32100\r\nPPV\t20\r\nCS\t0\r\nERR\t0\r\nLOAD\tON\r\nIL\t2320\r\nH19\t0\r\nH20\t30\r\nH21\t222\r\nH22\t0\r\nH23\t0\r\nHSDS\t0\r\nChecksum\t'184'\r\n";
+unsigned power = 0;
+unsigned peak_power = 0;
+unsigned yield = 0;
+unsigned v_batt_mv = 0;
+unsigned i_batt_ma = 0;
+unsigned efficiency_2dp = 0;
+unsigned i_load_ma = 0;
+
 
 static void fail(esp_event_t outcome, char * response){
     char outcome_msg[32];
@@ -67,122 +81,11 @@ static void send_tcp(client i_esp_console i_esp, const char * pkt){
     if (outcome != ESP_OK) fail(outcome, response);
 }
 
-// Update the value if
-unsigned process_line(const char * field, const char * line, unsigned current){
-    unsigned ret = current;
-    char * outcome = strstr(line, field);
-    if (outcome && (outcome == line)) {
-        ret = atoi(outcome + strlen(field));
-        printf("field: %s val: %d\n", field, ret);
-    }
-    return ret;
-}
-
-
-unsigned power = 0;
-unsigned peak_power = 0;
-unsigned yield = 0;
-unsigned v_batt_mv = 0;
-unsigned i_batt_ma = 0;
-unsigned efficiency_2dp = 0;
-unsigned i_load_ma = 0;
-
-unsafe{
-    volatile unsigned * unsafe power_ptr = &power;
-    volatile unsigned * unsafe peak_power_ptr = &peak_power;
-    volatile unsigned * unsafe yield_ptr = &yield;
-    volatile unsigned * unsafe v_batt_mv_ptr = &v_batt_mv;
-    volatile unsigned * unsafe i_batt_ma_ptr = &i_batt_ma;
-    volatile unsigned * unsafe efficiency_2dp_ptr = &efficiency_2dp;
-    volatile unsigned * unsafe i_load_ma_ptr = &i_load_ma;
-}
-
-void solar_sim(client uart_tx_if i_uart_tx){
-#if FIXED_STRING
-    char * str = mppt;
-    while(1){
-        char tx = *str;
-        i_uart_tx.write(tx);
-        ++str;
-        if (str == (mppt + strlen(mppt))) str = mppt;
-        delay_milliseconds(500);
-    }
-#else
-    random_generator_t my_rand = random_create_generator_from_hw_seed();
-    while(1){
-        unsigned spower = 100 + (random_get_random_number(my_rand) % 30);
-        unsigned speak_power = 0;
-        unsigned syield = 0;
-        unsigned sv_batt_mv = 13000 + (random_get_random_number(my_rand) % 100);
-        unsigned si_batt_ma = 1000 + (random_get_random_number(my_rand) % 1000);
-        unsigned sefficiency_2dp = 0;
-        unsigned si_load_ma = 2000 + (random_get_random_number(my_rand) % 1000);
-
-        char tx_str[64];
-        tx_str[0] = 0;
-
-
-        sprintf(tx_str, "IL\t%d\r\n", si_load_ma);
-        for (int i = 0; i < strlen(tx_str); ++i) i_uart_tx.write(tx_str[i]);
-
-        sprintf(tx_str, "PPV\t%d\r\n", spower);
-        for (int i = 0; i < strlen(tx_str); ++i) i_uart_tx.write(tx_str[i]);
-
-        sprintf(tx_str, "I\t%d\r\n", si_batt_ma);
-        for (int i = 0; i < strlen(tx_str); ++i) i_uart_tx.write(tx_str[i]);
-
-        sprintf(tx_str, "V\t%d\r\n", v_batt_mv_ptr);
-        for (int i = 0; i < strlen(tx_str); ++i) i_uart_tx.write(tx_str[i]);
-
-        delay_seconds(5);
-    }
-#endif
-}
-
-
-void solar_decoder(client uart_rx_if i_uart_rx){
-    match_t newline;
-    init_match(&newline, "\r\n");
-    char line[SOLAR_RX_BUFFER_SIZE];
-    unsigned line_idx = 0;
-
-    while(1){
-        select{
-            case i_uart_rx.data_ready(void):
-                char rx = i_uart_rx.read();
-                //printchar(rx);
-                line[line_idx] = rx;
-                ++line_idx;
-                if(line_idx == SOLAR_RX_BUFFER_SIZE){
-                    printf("Solar line overflow: %s\n", line);
-                    line_idx = 0;
-                }
-                int is_newline = match_str(&newline, rx);
-                if (is_newline){
-                    line[line_idx] = 0;
-                    line_idx = 0;
-                    unsafe{
-                        *power_ptr          = process_line("PPV\t", line, *power_ptr);
-                        *peak_power_ptr     = process_line("H21\t", line, *peak_power_ptr);
-                        *yield_ptr          = process_line("H20\t", line, *yield_ptr);
-                        *v_batt_mv_ptr      = process_line("V\t", line, *v_batt_mv_ptr);
-                        *i_batt_ma_ptr      = process_line("I\t", line, *i_batt_ma_ptr);
-                        *i_load_ma_ptr      = process_line("IL\t", line, *i_load_ma_ptr);
-                        unsigned tmp = (((*i_load_ma_ptr + *i_batt_ma_ptr) * *v_batt_mv_ptr) / 10000);
-                        if (tmp) *efficiency_2dp_ptr = *power_ptr / tmp; //Avoid divide by zero
-                        else *efficiency_2dp_ptr = 0;
-                    }
-                }
-                break;
-        }
-    }
-}
-
 void app(client i_esp_console i_esp){
     char response[RX_BUFFER_SIZE] = {0};
     char msg[TX_BUFFER_SIZE] = {0};
 
-    printf("**Test started**\n");
+    printf("**Solar IOT started**\n");
 
     //Init values
     power = 85;
@@ -233,7 +136,7 @@ void app(client i_esp_console i_esp){
 
         do_esp_cmd(i_esp, conn_close);  //Close TCP
 
-        delay_seconds(30);
+        delay_seconds(THINGSPEAK_UPDATE_S);
     }
 }
 
@@ -251,6 +154,7 @@ int main() {
   interface uart_tx_if i_solar_tx;
   output_gpio_if i_gpio_solar_tx[1];
 
+  interface spi_master_if i_spi[1];
 
   i_esp_console i_esp;
   par {
@@ -272,12 +176,14 @@ int main() {
     on tile[0]: app(i_esp);
     on tile[0]: esp_console_task(i_esp, i_tx, i_rx);
 
-    on tile[0]: solar_decoder(i_solar_rx);
+    on tile[0]: unsafe{ solar_decoder(i_solar_rx, i_spi[0]);}
 
     on tile[0]: solar_sim(i_solar_tx);
     on tile[0]: output_gpio(i_gpio_solar_tx, 1, p_uart_solar_tx, null);
     on tile[0]: uart_tx(i_solar_tx, null,
                         SOLAR_BAUD_RATE, UART_PARITY_NONE, 8, 1, i_gpio_solar_tx[0]);
+
+    on tile[0]: spi_master(i_spi, 1, p_spi_clk, p_spi_da, null, p_spi_ss, 1, clk_spi);
   }
   return 0;
 }
