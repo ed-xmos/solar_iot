@@ -69,7 +69,7 @@ void led_print_str(client interface spi_master_if i_spi, char digits[8], unsigne
     for (int i=0; i<8; i++){
         char digit = digits[i];
         unsigned char bitmap;
-        if ((i > 0) && (i == (7 - dec_pt)))
+        if ((dec_pt > 0) && (i == (7 - dec_pt)))
           bitmap = 0x80; // Decimal point
         else 
           bitmap = 0x00; // Blank
