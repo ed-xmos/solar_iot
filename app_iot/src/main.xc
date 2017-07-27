@@ -44,7 +44,7 @@ const char send_varlen[]= "AT+CIPSEND=0,%d";
 const char update_thingspeak[] = "POST /update HTTP/1.1\nHost: api.thingspeak.com\nConnection: close\nX-THINGSPEAKAPIKEY: " THINGSPEAKKEYSTR "\nContent-Type: application/x-www-form-urlencoded\nContent-Length: %d\n";
 //const char msg_unformatted[]="field1=%d&field2=%d&field3=%d&field4=%d&field5=%d&field6=%d";
 //p, pp, yld, ib, v, eff_2dp
-const char msg_unformatted[]="field1=%d&field2=%d&field3=%d&field4=%d.%d&field5=%d.%d&field6=%d.%d";
+const char msg_unformatted[]="field1=%d&field2=%d&field3=%d&field4=%d.%03d&field5=%d.%03d&field6=%d.%02d";
 
 
 unsigned power = 0;
@@ -133,6 +133,7 @@ void app(client i_esp_console i_esp){
             v_batt_mv / 1000, v_batt_mv % 1000, 
             efficiency_2dp / 100, efficiency_2dp % 100
             ); //Create the payload
+        printf("%s\n", msg);
 
         sprintf(sendstr, update_thingspeak, strlen(msg)); //Format the update message with msg length
 
