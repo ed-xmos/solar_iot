@@ -136,7 +136,7 @@ unsafe void solar_decoder(client uart_rx_if i_uart_rx, client interface spi_mast
                         led_disp = H20;
                         break;
                     case H20:
-                        sprintf(led_str, "YLD%6d", *yield_ptr);
+                        sprintf(led_str, "YLD%5d", *yield_ptr);
                         dp = 0;
                         led_disp = PPV;
                         break;

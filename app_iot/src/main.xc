@@ -42,7 +42,10 @@ const char conn_thingspeak[]= "AT+CIPSTART=0,\"TCP\",\"api.thingspeak.com\",80";
 const char conn_close[]     = "AT+CIPCLOSE=0";
 const char send_varlen[]= "AT+CIPSEND=0,%d";
 const char update_thingspeak[] = "POST /update HTTP/1.1\nHost: api.thingspeak.com\nConnection: close\nX-THINGSPEAKAPIKEY: " THINGSPEAKKEYSTR "\nContent-Type: application/x-www-form-urlencoded\nContent-Length: %d\n";
-const char msg_unformatted[]="field1=%d&field2=%d&field3=%d&field4=%d&field5=%d&field6=%d";
+//const char msg_unformatted[]="field1=%d&field2=%d&field3=%d&field4=%d&field5=%d&field6=%d";
+//p, pp, yld, ib, v, eff_2dp
+const char msg_unformatted[]="field1=%d&field2=%d&field3=%d&field4=%d.%d&field5=%d.%d&field6=%d.%d";
+
 
 unsigned power = 0;
 unsigned peak_power = 0;
@@ -124,7 +127,13 @@ void app(client i_esp_console i_esp){
 
     while(1){
         char sendstr[TX_BUFFER_SIZE];
-        sprintf(msg, msg_unformatted, power, peak_power, yield, i_batt_ma, v_batt_mv, efficiency_2dp); //Create the payload
+        //sprintf(msg, msg_unformatted, power, peak_power, yield, i_batt_ma, v_batt_mv, efficiency_2dp); //Create the payload
+        sprintf(msg, msg_unformatted, power, peak_power, yield, 
+            i_batt_ma / 1000, i_batt_ma % 1000, 
+            v_batt_mv / 1000, v_batt_mv % 1000, 
+            efficiency_2dp / 100, efficiency_2dp % 100
+            ); //Create the payload
+
         sprintf(sendstr, update_thingspeak, strlen(msg)); //Format the update message with msg length
 
         //printf("sendstr.len=%d", strlen(sendstr));
