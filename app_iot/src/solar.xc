@@ -1,12 +1,16 @@
 #include "solar.h"
 
+#define PRINT_SOLAR_DECODE  0
+
 // Update the value if key value found, else leave as is
 static unsigned process_line(const char * field, const char * line, unsigned current){
     unsigned ret = current;
     char * outcome = strstr(line, field);
     if (outcome && (outcome == line)) {
         ret = atoi(outcome + strlen(field));
+#if PRINT_SOLAR_DECODE
         printf("field: %s val: %d\n", field, ret);
+#endif
     }
     return ret;
 }
@@ -115,8 +119,8 @@ unsafe void solar_decoder(client uart_rx_if i_uart_rx, client interface spi_mast
                     *v_batt_mv_ptr      = process_line("V\t", line, *v_batt_mv_ptr);
                     *i_batt_ma_ptr      = process_line("I\t", line, *i_batt_ma_ptr);
                     *i_load_ma_ptr      = process_line("IL\t", line, *i_load_ma_ptr);
-                    unsigned tmp = (((*i_load_ma_ptr + *i_batt_ma_ptr) * *v_batt_mv_ptr) / 10000);
-                    if (tmp) *efficiency_2dp_ptr = *power_ptr / tmp; //Avoid divide by zero
+                    unsigned power_out = (((*i_load_ma_ptr + *i_batt_ma_ptr) * *v_batt_mv_ptr) / 100);
+                    if (*power_ptr) *efficiency_2dp_ptr = power_out / *power_ptr; //Avoid divide by zero
                     else *efficiency_2dp_ptr = 0;
 
                 }
@@ -131,13 +135,13 @@ unsafe void solar_decoder(client uart_rx_if i_uart_rx, client interface spi_mast
                         led_disp = I;
                         break;
                     case I:
-                        sprintf(led_str, "IB%6d", *i_batt_ma_ptr);
+                        sprintf(led_str, "IBT%5d", *i_batt_ma_ptr);
                         dp = 3;
                         led_disp = H20;
                         break;
                     case H20:
                         sprintf(led_str, "YLD%5d", *yield_ptr);
-                        dp = 0;
+                        dp = 2;
                         led_disp = PPV;
                         break;
                 }
