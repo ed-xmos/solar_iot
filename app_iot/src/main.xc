@@ -150,6 +150,28 @@ void app(client i_esp_console i_esp){
     }
 }
 
+ // Set xCORE tile standby clock to 100MHz from 500MHz System frequency
+#define STANDBY_CLOCK_DIVIDER   (5-1)
+#define XCORE_CTRL0_CLOCK_MASK  0x30
+#define XCORE_CTRL0_ENABLE_AEC  0x30
+
+void enableAEC(unsigned standbyClockDivider)
+{
+    unsigned xcore_ctrl0_data;
+    // Set standby divider
+    write_pswitch_reg(get_local_tile_id(),
+                XS1_PSWITCH_PLL_CLK_DIVIDER_NUM,
+                standbyClockDivider);
+    // Modify the clock control bits
+    xcore_ctrl0_data = getps(XS1_PS_XCORE_CTRL0);
+    xcore_ctrl0_data &= 0xffffffff - XCORE_CTRL0_CLOCK_MASK;
+    xcore_ctrl0_data +=  XCORE_CTRL0_ENABLE_AEC;
+    setps(XS1_PS_XCORE_CTRL0, xcore_ctrl0_data);
+}
+
+
+
+
 /* "main" function that sets up two uarts, console and the application */
 int main() {
   interface uart_rx_if i_rx;
@@ -183,7 +205,10 @@ int main() {
                                  SOLAR_BAUD_RATE, UART_PARITY_NONE, 8, 1,
                                  i_gpio_solar_rx);
     
-    on tile[0]: app(i_esp);
+    on tile[0]: {
+        enableAEC(STANDBY_CLOCK_DIVIDER);
+        app(i_esp, i_spi[1]);
+    }
     on tile[0]: esp_console_task(i_esp, i_tx, i_rx);
 
     on tile[0]: unsafe{ solar_decoder(i_solar_rx, i_spi[0]);}

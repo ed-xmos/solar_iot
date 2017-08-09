@@ -50,7 +50,7 @@ void init_led(client interface spi_master_if i_spi){
     i_spi.end_transaction(DEASSERT_TICKS);
 
     i_spi.begin_transaction(0, SPI_KHZ, SPI_MODE_3);
-    i_spi.transfer8(0xa); i_spi.transfer8(0x07); // 0xf = max brightness
+    i_spi.transfer8(0xa); i_spi.transfer8(0x0f); // max brightness
     i_spi.end_transaction(DEASSERT_TICKS);
 
     i_spi.begin_transaction(0, SPI_KHZ, SPI_MODE_3);
