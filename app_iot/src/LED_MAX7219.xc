@@ -28,12 +28,14 @@ static const digit_t digit_map[] = {
   {'Y',  0b00111011},
   {'-',  0b00000001},
   {'V',  0b00111110},
+  {'U',  0b00111110},
   {'T',  0b00001111},
   {'D',  0b00111101},
   {'B',  0b00011111},
   {'L',  0b00001110},
   {'O',  0b01111110},
   {'I',  0b00110000},
+  {'N',  0b00010101},
 };
 
 void init_led(client interface spi_master_if i_spi){
@@ -48,7 +50,7 @@ void init_led(client interface spi_master_if i_spi){
     i_spi.end_transaction(DEASSERT_TICKS);
 
     i_spi.begin_transaction(0, SPI_KHZ, SPI_MODE_3);
-    i_spi.transfer8(0xa); i_spi.transfer8(0x0f); // max brightness
+    i_spi.transfer8(0xa); i_spi.transfer8(0x07); // 0xf = max brightness
     i_spi.end_transaction(DEASSERT_TICKS);
 
     i_spi.begin_transaction(0, SPI_KHZ, SPI_MODE_3);
