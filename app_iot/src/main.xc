@@ -59,7 +59,7 @@ unsigned i_load_ma = 0;
 static void fail(esp_event_t outcome, char * response){
     char outcome_msg[32];
     event_to_text(outcome, outcome_msg);
-    printf("Outcome: %s, Response: %s\n", outcome_msg, response);
+    printf("FAIL CALLED::Outcome: %s, Response: %s\n", outcome_msg, response);
     //_Exit(-1);
 }
 
@@ -71,35 +71,44 @@ static void do_esp_cmd(client i_esp_console i_esp, const char * cmd){
     if (outcome != ESP_OK) fail(outcome, response);
 }
 
-static void send_tcp(client i_esp_console i_esp, const char * pkt){
+static int send_tcp(client i_esp_console i_esp, const char * pkt){
+    int ret = 0; //OK
     esp_event_t outcome;
     char response[RX_BUFFER_SIZE];
     char sendcmd[TX_BUFFER_SIZE];
     sprintf(sendcmd, send_varlen, strlen(pkt) + 2);
     outcome = send_cmd_ack(i_esp, sendcmd, response, 1);
     printf("Response: %s", response);
-    if (outcome != ESP_OK) fail(outcome, response);
+    if (outcome != ESP_OK) {
+        fail(outcome, response);
+        ret = 1;
+    }
     outcome = send_cmd_ack(i_esp, pkt, response, 1);
     printf("Response: %s", response);
-    if (outcome != ESP_OK) fail(outcome, response);
+    if (outcome != ESP_OK) {
+        fail(outcome, response);
+        ret = 1;
+    }
+    return ret;
 }
 
-void app(client i_esp_console i_esp){
+void app(client i_esp_console i_esp, client interface spi_master_if i_spi){
     char response[RX_BUFFER_SIZE] = {0};
     char msg[TX_BUFFER_SIZE] = {0};
 
     printf("**Solar IOT started**\n");
 
     //Init values
+    /*
     power = 85;
     peak_power = 120;
 
     v_batt_mv = 13640;
     i_batt_ma = 423;
-    efficiency_2dp = 9221;
+    efficiency_2dp = 9221;*/
 
-    //Try 10 resets
-    for (int i = 0; i < 0; ++i){
+    //Try some resets
+    for (int i = 0; i < 1; ++i){
         char event_type[32];
 
         esp_event_t event = ESP_NO_EVENT;
@@ -122,13 +131,15 @@ void app(client i_esp_console i_esp){
         delay_seconds(3);
         do_esp_cmd(i_esp, list_ap);
     }
+    
     do_esp_cmd(i_esp, connect);
+    do_esp_cmd(i_esp, "AT+CIPMUX?"); //find out mode. TODO remove this debug line
     do_esp_cmd(i_esp, enable_conns);
 
     while(1){
         char sendstr[TX_BUFFER_SIZE];
         //sprintf(msg, msg_unformatted, power, peak_power, yield, i_batt_ma, v_batt_mv, efficiency_2dp); //Create the payload
-        sprintf(msg, msg_unformatted, power, peak_power, yield, 
+        sprintf(msg, msg_unformatted, power, peak_power, yield * 10, 
             i_batt_ma / 1000, i_batt_ma % 1000, 
             v_batt_mv / 1000, v_batt_mv % 1000, 
             efficiency_2dp / 100, efficiency_2dp % 100
@@ -139,10 +150,14 @@ void app(client i_esp_console i_esp){
 
         //printf("sendstr.len=%d", strlen(sendstr));
 
-        do_esp_cmd(i_esp, conn_thingspeak); //Open TCP
+        do_esp_cmd(i_esp, conn_thingspeak);     //Open TCP
 
-        send_tcp(i_esp, sendstr);       //start sending
-        send_tcp(i_esp, msg);           //payload
+        int fail = 0;
+        fail += send_tcp(i_esp, sendstr);       //start sending
+        fail += send_tcp(i_esp, msg);           //payload
+
+        if (fail) led_print_str(i_spi, "UPLD ERR", 0);
+        else led_print_str(i_spi, "UPLOADED", 0);
 
         do_esp_cmd(i_esp, conn_close);  //Close TCP
 
@@ -186,7 +201,7 @@ int main() {
   interface uart_tx_if i_solar_tx;
   output_gpio_if i_gpio_solar_tx[1];
 
-  interface spi_master_if i_spi[1];
+  interface spi_master_if i_spi[2];
 
   i_esp_console i_esp;
   par {
@@ -218,7 +233,7 @@ int main() {
     on tile[0]: uart_tx(i_solar_tx, null,
                         SOLAR_BAUD_RATE, UART_PARITY_NONE, 8, 1, i_gpio_solar_tx[0]);
 
-    on tile[0]: spi_master(i_spi, 1, p_spi_clk, p_spi_da, null, p_spi_ss, 1, clk_spi);
+    on tile[0]: spi_master(i_spi, 2, p_spi_clk, p_spi_da, null, p_spi_ss, 1, clk_spi);
   }
   return 0;
 }
