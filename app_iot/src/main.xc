@@ -233,7 +233,7 @@ int main() {
 
     on tile[0]: spi_master(i_spi, 2, p_spi_clk, p_spi_da, null, p_spi_ss, 1, clk_spi);
 
-    on tile[0]: solar_sim(i_solar_tx);
+    //on tile[0]: solar_sim(i_solar_tx);
 
   }
   return 0;
