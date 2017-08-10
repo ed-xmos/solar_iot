@@ -52,7 +52,7 @@ unsigned peak_power = 0;
 unsigned yield = 0;
 unsigned v_solar_mv = 0;
 unsigned v_batt_mv = 0;
-unsigned i_batt_ma = 0;
+int i_batt_ma = 0;
 unsigned efficiency_2dp = 0;
 unsigned i_load_ma = 0;
 
@@ -130,13 +130,15 @@ void app(client i_esp_console i_esp, client interface spi_master_if i_spi){
 
     while(1){
         char sendstr[TX_BUFFER_SIZE];
-        sprintf(msg, msg_unformatted, power,
-            v_solar_mv / 1000, (v_solar_mv < 0) ? -(v_solar_mv % 1000) : (v_solar_mv % 1000),
+        sprintf(msg, msg_unformatted,
+            power,
+            v_solar_mv / 1000, v_solar_mv % 1000,
             yield * 10, 
-            i_batt_ma / 1000, i_batt_ma % 1000, 
+            i_batt_ma / 1000, (i_batt_ma < 0) ? -(i_batt_ma % 1000) : (i_batt_ma % 1000), 
             v_batt_mv / 1000, v_batt_mv % 1000, 
             efficiency_2dp / 100, efficiency_2dp % 100
             ); //Create the payload
+        printf("i_batt_ma=%d, %d, %d, %d\n", i_batt_ma, i_batt_ma / 1000, i_batt_ma % 1000, -(i_batt_ma %1000));
         printf("%s\n", msg);
 
         sprintf(sendstr, update_thingspeak, strlen(msg)); //Format the update message with msg length

@@ -21,7 +21,7 @@ extern unsigned peak_power;
 extern unsigned yield;
 extern unsigned v_solar_mv;
 extern unsigned v_batt_mv;
-extern unsigned i_batt_ma;
+extern int i_batt_ma;
 extern unsigned efficiency_2dp;
 extern unsigned i_load_ma;
 
@@ -31,7 +31,7 @@ unsafe{
     volatile unsigned * unsafe yield_ptr = &yield;
     volatile unsigned * unsafe v_solar_mv_ptr = &v_solar_mv;
     volatile unsigned * unsafe v_batt_mv_ptr = &v_batt_mv;
-    volatile unsigned * unsafe i_batt_ma_ptr = &i_batt_ma;
+    volatile int * unsafe i_batt_ma_ptr = &i_batt_ma;
     volatile unsigned * unsafe efficiency_2dp_ptr = &efficiency_2dp;
     volatile unsigned * unsafe i_load_ma_ptr = &i_load_ma;
 }
