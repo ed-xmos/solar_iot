@@ -93,7 +93,7 @@ static int send_tcp(client i_esp_console i_esp, const char * pkt){
     return ret;
 }
 
-void app(client i_esp_console i_esp, client interface spi_master_if i_spi){
+int app(client i_esp_console i_esp, client interface spi_master_if i_spi){
     char response[RX_BUFFER_SIZE] = {0};
     char msg[TX_BUFFER_SIZE] = {0};
 
@@ -117,14 +117,12 @@ void app(client i_esp_console i_esp, client interface spi_master_if i_spi){
         delay_seconds(5);
     }
 
-    //do_esp_cmd(i_esp, get_ip);
 
-    while(0){
-        delay_seconds(3);
-        do_esp_cmd(i_esp, list_ap);
-    }
+    do_esp_cmd(i_esp, list_ap);
     
     do_esp_cmd(i_esp, connect);
+    do_esp_cmd(i_esp, get_ip);
+
     do_esp_cmd(i_esp, "AT+CIPMUX?"); //find out mode. TODO remove this debug line
     do_esp_cmd(i_esp, enable_conns);
 
@@ -151,13 +149,17 @@ void app(client i_esp_console i_esp, client interface spi_master_if i_spi){
         fail += send_tcp(i_esp, sendstr);       //start sending
         fail += send_tcp(i_esp, msg);           //payload
 
-        if (fail) led_print_str(i_spi, "UPLD ERR", 0);
+        if (fail) {
+            led_print_str(i_spi, "UPLD ERR", 0);
+            return -1;
+        }
         else led_print_str(i_spi, "UPLOADED", 0);
 
         do_esp_cmd(i_esp, conn_close);  //Close TCP
 
         delay_seconds(THINGSPEAK_UPDATE_S);
     }
+    return 0;
 }
 
  // Set xCORE tile standby clock to 100MHz from 500MHz System frequency
@@ -217,7 +219,9 @@ int main() {
     
     on tile[0]: {
         enableAEC(STANDBY_CLOCK_DIVIDER);
-        app(i_esp, i_spi[1]);
+        while(1){
+            app(i_esp, i_spi[1]);
+        }
     }
     on tile[0]: esp_console_task(i_esp, i_tx, i_rx);
 
