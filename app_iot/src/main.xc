@@ -67,8 +67,8 @@ static void fail(esp_event_t outcome, char * response){
 static void do_esp_cmd(client i_esp_console i_esp, const char * cmd){
     esp_event_t outcome;
     char response[RX_BUFFER_SIZE];
-    outcome = send_cmd_ack(i_esp, cmd, response, 10);
-    printf("Cmd: %s Response: %s", cmd, response);
+    outcome = send_cmd_ack(i_esp, cmd, response, 20);
+    //printf("Cmd: %s Response: %s", cmd, response);
     if (outcome != ESP_OK) fail(outcome, response);
 }
 
@@ -79,13 +79,13 @@ static int send_tcp(client i_esp_console i_esp, const char * pkt){
     char sendcmd[TX_BUFFER_SIZE];
     sprintf(sendcmd, send_varlen, strlen(pkt) + 2);
     outcome = send_cmd_ack(i_esp, sendcmd, response, 1);
-    printf("Response: %s", response);
+    //printf("Response: %s", response);
     if (outcome != ESP_OK) {
         fail(outcome, response);
         ret = 1;
     }
     outcome = send_cmd_ack(i_esp, pkt, response, 1);
-    printf("Response: %s", response);
+    //printf("Response: %s", response);
     if (outcome != ESP_OK) {
         fail(outcome, response);
         ret = 1;

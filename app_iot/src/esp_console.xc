@@ -11,7 +11,7 @@
 #include "esp_console.h"
 #include "match.h"
 
-#define DEBUG_MSGS  0
+#define DEBUG_MSGS  1
 
 [[combinable]]
 void esp_console_task(server i_esp_console i_esp, client uart_tx_if i_uart_tx, client uart_rx_if i_uart_rx ) {
