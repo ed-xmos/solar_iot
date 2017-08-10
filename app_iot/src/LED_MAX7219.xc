@@ -36,6 +36,7 @@ static const digit_t digit_map[] = {
   {'O',  0b01111110},
   {'I',  0b00110000},
   {'N',  0b00010101},
+  {'S',  0b01011011},
 };
 
 void init_led(client interface spi_master_if i_spi){

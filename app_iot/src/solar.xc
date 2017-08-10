@@ -19,6 +19,7 @@ static unsigned process_line(const char * field, const char * line, unsigned cur
 extern unsigned power;
 extern unsigned peak_power;
 extern unsigned yield;
+extern unsigned v_solar_mv;
 extern unsigned v_batt_mv;
 extern unsigned i_batt_ma;
 extern unsigned efficiency_2dp;
@@ -28,6 +29,7 @@ unsafe{
     volatile unsigned * unsafe power_ptr = &power;
     volatile unsigned * unsafe peak_power_ptr = &peak_power;
     volatile unsigned * unsafe yield_ptr = &yield;
+    volatile unsigned * unsafe v_solar_mv_ptr = &v_solar_mv;
     volatile unsigned * unsafe v_batt_mv_ptr = &v_batt_mv;
     volatile unsigned * unsafe i_batt_ma_ptr = &i_batt_ma;
     volatile unsigned * unsafe efficiency_2dp_ptr = &efficiency_2dp;
@@ -48,6 +50,7 @@ void solar_sim(client uart_tx_if i_uart_tx){
         unsigned sv_batt_mv = 13000 + (random_get_random_number(my_rand) % 100);
         unsigned si_batt_ma = 1000 + (random_get_random_number(my_rand) % 1000);
         unsigned si_load_ma = 2000 + (random_get_random_number(my_rand) % 1000);
+        unsigned sv_solar_mv = 29000 + (random_get_random_number(my_rand) % 3000);
 
         char tx_str[64];
         tx_str[0] = 0;
@@ -63,6 +66,9 @@ void solar_sim(client uart_tx_if i_uart_tx){
         for (int i = 0; i < strlen(tx_str); ++i) i_uart_tx.write(tx_str[i]);
 
         sprintf(tx_str, "V\t%d\r\n", sv_batt_mv);
+        for (int i = 0; i < strlen(tx_str); ++i) i_uart_tx.write(tx_str[i]);
+
+        sprintf(tx_str, "VPV\t%d\r\n", sv_solar_mv);
         for (int i = 0; i < strlen(tx_str); ++i) i_uart_tx.write(tx_str[i]);
 
         sprintf(tx_str, "H20\t%d\r\n", syield);
@@ -118,6 +124,7 @@ unsafe void solar_decoder(client uart_rx_if i_uart_rx, client interface spi_mast
                     *yield_ptr          = process_line("H20\t", line, *yield_ptr);
                     *v_batt_mv_ptr      = process_line("V\t", line, *v_batt_mv_ptr);
                     *i_batt_ma_ptr      = process_line("I\t", line, *i_batt_ma_ptr);
+                    *v_solar_mv_ptr     = process_line("VPV\t", line, *v_solar_mv_ptr);
                     *i_load_ma_ptr      = process_line("IL\t", line, *i_load_ma_ptr);
                     unsigned power_out = (((*i_load_ma_ptr + *i_batt_ma_ptr) * *v_batt_mv_ptr) / 100);
                     if (*power_ptr) *efficiency_2dp_ptr = power_out / *power_ptr; //Avoid divide by zero
@@ -130,7 +137,7 @@ unsafe void solar_decoder(client uart_rx_if i_uart_rx, client interface spi_mast
                 unsigned dp = 0;
                 switch(led_disp){
                     case PPV:
-                        sprintf(led_str, "POWw%4d", *power_ptr);
+                        sprintf(led_str, "PSOL%4d", *power_ptr);
                         dp = 0;
                         led_disp = I;
                         break;

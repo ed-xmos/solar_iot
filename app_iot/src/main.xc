@@ -44,12 +44,13 @@ const char send_varlen[]= "AT+CIPSEND=0,%d";
 const char update_thingspeak[] = "POST /update HTTP/1.1\nHost: api.thingspeak.com\nConnection: close\nX-THINGSPEAKAPIKEY: " THINGSPEAKKEYSTR "\nContent-Type: application/x-www-form-urlencoded\nContent-Length: %d\n";
 //const char msg_unformatted[]="field1=%d&field2=%d&field3=%d&field4=%d&field5=%d&field6=%d";
 //p, pp, yld, ib, v, eff_2dp
-const char msg_unformatted[]="field1=%d&field2=%d&field3=%d&field4=%d.%03d&field5=%d.%03d&field6=%d.%02d";
+const char msg_unformatted[]="field1=%d&field2=%d.%03d&field3=%d&field4=%d.%03d&field5=%d.%03d&field6=%d.%02d";
 
 
 unsigned power = 0;
 unsigned peak_power = 0;
 unsigned yield = 0;
+unsigned v_solar_mv = 0;
 unsigned v_batt_mv = 0;
 unsigned i_batt_ma = 0;
 unsigned efficiency_2dp = 0;
@@ -98,15 +99,6 @@ void app(client i_esp_console i_esp, client interface spi_master_if i_spi){
 
     printf("**Solar IOT started**\n");
 
-    //Init values
-    /*
-    power = 85;
-    peak_power = 120;
-
-    v_batt_mv = 13640;
-    i_batt_ma = 423;
-    efficiency_2dp = 9221;*/
-
     //Try some resets
     for (int i = 0; i < 1; ++i){
         char event_type[32];
@@ -138,8 +130,9 @@ void app(client i_esp_console i_esp, client interface spi_master_if i_spi){
 
     while(1){
         char sendstr[TX_BUFFER_SIZE];
-        //sprintf(msg, msg_unformatted, power, peak_power, yield, i_batt_ma, v_batt_mv, efficiency_2dp); //Create the payload
-        sprintf(msg, msg_unformatted, power, peak_power, yield * 10, 
+        sprintf(msg, msg_unformatted, power,
+            v_solar_mv / 1000, (v_solar_mv < 0) ? -(v_solar_mv % 1000) : (v_solar_mv % 1000),
+            yield * 10, 
             i_batt_ma / 1000, i_batt_ma % 1000, 
             v_batt_mv / 1000, v_batt_mv % 1000, 
             efficiency_2dp / 100, efficiency_2dp % 100
@@ -148,7 +141,7 @@ void app(client i_esp_console i_esp, client interface spi_master_if i_spi){
 
         sprintf(sendstr, update_thingspeak, strlen(msg)); //Format the update message with msg length
 
-        //printf("sendstr.len=%d", strlen(sendstr));
+        printf("sendstr.len=%d", strlen(sendstr));
 
         do_esp_cmd(i_esp, conn_thingspeak);     //Open TCP
 
@@ -228,12 +221,14 @@ int main() {
 
     on tile[0]: unsafe{ solar_decoder(i_solar_rx, i_spi[0]);}
 
-    on tile[0]: solar_sim(i_solar_tx);
     on tile[0]: output_gpio(i_gpio_solar_tx, 1, p_uart_solar_tx, null);
     on tile[0]: uart_tx(i_solar_tx, null,
                         SOLAR_BAUD_RATE, UART_PARITY_NONE, 8, 1, i_gpio_solar_tx[0]);
 
     on tile[0]: spi_master(i_spi, 2, p_spi_clk, p_spi_da, null, p_spi_ss, 1, clk_spi);
+
+    on tile[0]: solar_sim(i_solar_tx);
+
   }
   return 0;
 }
