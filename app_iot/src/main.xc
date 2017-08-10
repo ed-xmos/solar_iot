@@ -157,7 +157,8 @@ int app(client i_esp_console i_esp, client interface spi_master_if i_spi){
 
         do_esp_cmd(i_esp, conn_close);  //Close TCP
 
-        delay_seconds(THINGSPEAK_UPDATE_S);
+        //Delay seconds cannot handle more than 42 so do a loop instead
+        for(int i = 0; i < THINGSPEAK_UPDATE_S; i++ ) delay_seconds(1);
     }
     return 0;
 }
