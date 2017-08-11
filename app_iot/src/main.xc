@@ -30,7 +30,7 @@ on tile[0] : clock clk_spi                  = XS1_CLKBLK_1;
 
 const char fw_info[]        = "AT+GMR"; //Firmware info
 const char reset[]          = "AT+RST"; //Restart ends with "ready"
-const char set_ap_mode[]    = "AT+CWMODE=3";  //AP & client
+const char set_ap_mode[]    = "AT+CWMODE=1";  //Client only
 const char list_ap[]        = "AT+CWLAP"; //List AP
 const char connect[]        = CONNECT;  //Defined in esp_console.h
 const char get_ip[]         = "AT+CIFSR"; //get IP address
