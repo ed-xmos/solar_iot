@@ -23,6 +23,8 @@
 #define THINGSPEAK_UPDATE_S 	    30
 #define DISPLAY_UPDATE_S            5
 
+#define SOLAR_SIM							0 //Task which streams simulated MPPT data
+
 #include "credentials.h"   //File cotaining #define SSID <my-ssid> and #define PASSWORD <my-ap-passord> and #define THINGSPEAKEY  <key>
 
 #endif /* APP_SETTINGS_H_ */

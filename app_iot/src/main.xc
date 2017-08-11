@@ -194,8 +194,10 @@ int main() {
   interface uart_rx_if i_solar_rx;
   input_gpio_if i_gpio_solar_rx;
 
+#if SOLAR_SIM
   interface uart_tx_if i_solar_tx;
   output_gpio_if i_gpio_solar_tx[1];
+#endif
 
   interface spi_master_if i_spi[2];
 
@@ -226,14 +228,15 @@ int main() {
 
     on tile[0]: unsafe{ solar_decoder(i_solar_rx, i_spi[0]);}
 
-    on tile[0]: output_gpio(i_gpio_solar_tx, 1, p_uart_solar_tx, null);
-    on tile[0]: uart_tx(i_solar_tx, null,
-                        SOLAR_BAUD_RATE, UART_PARITY_NONE, 8, 1, i_gpio_solar_tx[0]);
 
     on tile[0]: spi_master(i_spi, 2, p_spi_clk, p_spi_da, null, p_spi_ss, 1, clk_spi);
 
-    //on tile[0]: solar_sim(i_solar_tx);
-
+#if SOLAR_SIM
+    on tile[0]: solar_sim(i_solar_tx);
+    on tile[0]: output_gpio(i_gpio_solar_tx, 1, p_uart_solar_tx, null);
+    on tile[0]: uart_tx(i_solar_tx, null,
+                        SOLAR_BAUD_RATE, UART_PARITY_NONE, 8, 1, i_gpio_solar_tx[0]);
+#endif
   }
   return 0;
 }
