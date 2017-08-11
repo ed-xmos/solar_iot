@@ -90,17 +90,39 @@ typedef enum {
         H21
 } led_disp_t;
 
+
+unsafe void update_display(led_disp_t led_disp, client interface spi_master_if i_spi){
+    unsigned dp = 0;
+    char led_str[8];
+
+    switch(led_disp){
+        case PPV:
+            sprintf(led_str, "PSOL%4d", *power_ptr);
+            dp = 0;
+            break;
+        case I:
+            sprintf(led_str, "IBT%5d", *i_batt_ma_ptr);
+            dp = 3;
+            break;
+        case H20:
+            sprintf(led_str, "YLD%5d", *yield_ptr);
+            dp = 2;
+            break;
+    }
+    led_print_str(i_spi, led_str, dp);
+}
+
 unsafe void solar_decoder(client uart_rx_if i_uart_rx, client interface spi_master_if i_spi) {
-    match_t newline;
+    match_t newline, checksum;
     init_match(&newline, "\r\n");
+    init_match(&checksum, "Checksum");
     char line[SOLAR_RX_BUFFER_SIZE];
     unsigned line_idx = 0;
 
     timer t;
-    int disp_time;
-    t :> disp_time;
+    int disp_time_change;
+    t :> disp_time_change;
 
-    char led_str[8];
     init_led(i_spi);
     led_disp_t led_disp = PPV;
 
@@ -131,29 +153,26 @@ unsafe void solar_decoder(client uart_rx_if i_uart_rx, client interface spi_mast
                     else *efficiency_2dp_ptr = 0;
 
                 }
+                int is_end_of_update = match_str(&checksum, rx);
+                if (is_end_of_update){
+                    update_display(led_disp, i_spi);
+                }
                 break;
 
-            case t when timerafter(disp_time) :> disp_time:
+            case t when timerafter(disp_time_change) :> disp_time_change:
                 unsigned dp = 0;
                 switch(led_disp){
                     case PPV:
-                        sprintf(led_str, "PSOL%4d", *power_ptr);
-                        dp = 0;
                         led_disp = I;
                         break;
                     case I:
-                        sprintf(led_str, "IBT%5d", *i_batt_ma_ptr);
-                        dp = 3;
                         led_disp = H20;
                         break;
                     case H20:
-                        sprintf(led_str, "YLD%5d", *yield_ptr);
-                        dp = 2;
                         led_disp = PPV;
                         break;
                 }
-                led_print_str(i_spi, led_str, dp);
-                disp_time += (DISPLAY_UPDATE_S * SECOND_TICKS);
+                disp_time_change += (DISPLAY_UPDATE_S * SECOND_TICKS);
 
                 break;
         }
